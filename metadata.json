@@ -1,0 +1,6 @@
+{
+  "name": "Dogesh Signal",
+  "description": "A calm, premium message assistant that analyzes risk levels, pressure patterns, and vague commitments in text messages.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
