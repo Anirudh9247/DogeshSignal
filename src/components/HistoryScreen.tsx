@@ -13,7 +13,7 @@ import {
   HelpCircle,
   FolderOpen
 } from "lucide-react";
-import { AnalysisResult } from "../types";
+import { AnalysisResult } from "../types/analysis";
 
 interface HistoryScreenProps {
   theme: "light" | "dark";

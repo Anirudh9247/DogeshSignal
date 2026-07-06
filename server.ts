@@ -189,7 +189,7 @@ ${message}
 
     // Requesting a structured JSON output
     const response = await ai.models.generateContent({
-      model: "gemini-3.5-flash",
+      model: "gemini-2.5-flash",
       contents: userPrompt,
       config: {
         systemInstruction,
@@ -363,7 +363,7 @@ ${message}
 
 // App server startup
 async function startServer() {
-  const PORT = 3000;
+  const PORT = Number(process.env.PORT) || 3000;
 
   // Integrated Vite dev server mode vs Production static serve mode
   if (process.env.NODE_ENV !== "production") {
@@ -380,8 +380,8 @@ async function startServer() {
     });
   }
 
-  app.listen(PORT, "0.0.0.0", () => {
-    console.log(`[Dogesh Signal DB Node] Server running on http://0.0.0.0:${PORT}`);
+  app.listen(PORT, "localhost", () => {
+    console.log(`[Dogesh Signal DB Node] Server running on http://localhost:${PORT}`);
   });
 }
 

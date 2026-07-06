@@ -3,7 +3,8 @@ import { motion, AnimatePresence } from "motion/react";
 import { FloatingSystemParticles } from "./components/BrandSystem";
 
 // Shared Types
-import { AnalysisResult, SystemNotification } from "./types";
+import { AnalysisResult } from "./types/analysis";
+import { SystemNotification } from "./types";
 
 // Modular Screens
 import { Navbar } from "./components/Navbar";
@@ -13,6 +14,19 @@ import { ResultsDashboard } from "./components/ResultsDashboard";
 import { HistoryScreen } from "./components/HistoryScreen";
 import { SettingsScreen } from "./components/SettingsScreen";
 import { NotificationsScreen } from "./components/NotificationsScreen";
+import { Routes, Route, Navigate, useNavigate } from "react-router-dom";
+import { useAuth } from "./context/AuthContext";
+import Login from "./pages/Login";
+import Register from "./pages/Register";
+import { login as loginApi, register as registerApi } from "./services/authService";
+
+// Services
+import { analyzeMessage } from "./services/analysisService";
+import { saveHistory, loadHistory, importLocalHistoryToCloud } from "./services/historyService";
+import { PlanType, UserProfile, getMockUser, isLoggedIn } from "./plans/plans";
+import { PLAN_ENTITLEMENTS } from "./plans/entitlements";
+import { usageService } from "./services/usageService";
+import { localHistoryService } from "./services/localHistoryService";
 
 // Preset database templates
 const SAMPLES = [
@@ -174,7 +188,9 @@ const DEFAULT_HISTORY_ITEMS: AnalysisResult[] = [
   }
 ];
 
-export default function App() {
+function DashboardView() {
+  const navigate = useNavigate();
+  const { user, logout, updateUserPlan, login: authLogin } = useAuth();
   const [theme, setTheme] = useState<"light" | "dark" | "system">("dark");
   const [activeTab, setActiveTab] = useState<string>("landing");
   const [textSize, setTextSize] = useState<"sm" | "md" | "lg">("md");
@@ -197,15 +213,21 @@ export default function App() {
   const [messageText, setMessageText] = useState("");
   const [selectedContext, setSelectedContext] = useState("All Contexts");
   const [isAnalyzing, setIsAnalyzing] = useState(false);
-  const [activeDogLog, setActiveDogLog] = useState("Ready to analyze a message.");
-  const [error, setError] = useState<string | null>(null);
-
   // Loaded result state
   const [result, setResult] = useState<AnalysisResult | null>(null);
   const [history, setHistory] = useState<AnalysisResult[]>([]);
   const [searchQuery, setSearchQuery] = useState("");
   const [historyFilter, setHistoryFilter] = useState("ALL");
   const [isAllCopied, setIsAllCopied] = useState(false);
+
+  // Authentication & Usage tracking states
+  const [localHistoryCount, setLocalHistoryCount] = useState(0);
+  const [usageCount, setUsageCount] = useState(0);
+  const [showImportPrompt, setShowImportPrompt] = useState(false);
+  const [activeDogLog, setActiveDogLog] = useState("Ready to analyze a message.");
+  const [error, setError] = useState<string | null>(null);
+
+
 
   // Notification Queue
   const [notifications, setNotifications] = useState<SystemNotification[]>([
@@ -255,19 +277,54 @@ export default function App() {
       setTheme("dark");
     }
 
-    const savedHistory = localStorage.getItem("dogesh_premium_history");
-    if (savedHistory) {
+    const initHistoryAndCheckSync = async () => {
       try {
-        const parsed = JSON.parse(savedHistory);
-        setHistory(parsed);
+        // Load active history via strategy facade (local vs supabase)
+        const parsed = await loadHistory();
+        if (parsed.length > 0) {
+          setHistory(parsed);
+        } else {
+          setHistory(DEFAULT_HISTORY_ITEMS);
+          await saveHistory(DEFAULT_HISTORY_ITEMS);
+        }
+
+        // Edge Case: Guest -> Login Sync Prompt
+        // If logged in and there are unsynced guest history items locally
+        if (isLoggedIn()) {
+          const localLogs = await localHistoryService.loadHistory();
+          if (localLogs.length > 0) {
+            const shouldImport = window.confirm(
+              `You have ${localLogs.length} message analyses stored locally on this device. Would you like to import them into your cloud account?`
+            );
+            if (shouldImport) {
+              await importLocalHistoryToCloud();
+              const mergedHistory = await loadHistory();
+              setHistory(mergedHistory);
+            }
+          }
+        }
       } catch (e) {
         setHistory(DEFAULT_HISTORY_ITEMS);
+        await saveHistory(DEFAULT_HISTORY_ITEMS);
       }
-    } else {
-      setHistory(DEFAULT_HISTORY_ITEMS);
-      localStorage.setItem("dogesh_premium_history", JSON.stringify(DEFAULT_HISTORY_ITEMS));
-    }
+    };
+
+    initHistoryAndCheckSync();
   }, []);
+
+
+  // Load/update daily usage limit count and guest count for settings screen metrics
+  useEffect(() => {
+    const updateMetrics = async () => {
+      const email = user ? user.email : null;
+      const usage = await usageService.getUsage(email);
+      setUsageCount(usage.analysesToday);
+
+      const localLogs = await localHistoryService.loadHistory();
+      setLocalHistoryCount(localLogs.length);
+    };
+    updateMetrics();
+  }, [user, history]);
 
   // Sync theme class to document element for Tailwind dark variants
   useEffect(() => {
@@ -322,6 +379,26 @@ export default function App() {
       return;
     }
 
+    const user = getMockUser();
+    const activePlan = user ? user.plan : PlanType.SNIFF;
+    const email = user ? user.email : null;
+    const canScan = await usageService.checkDailyLimit(email, activePlan);
+    if (!canScan) {
+      setError(`Daily limit reached for ${activePlan.toUpperCase()} plan. Upgrade or try again tomorrow!`);
+      
+      const limitNotif: SystemNotification = {
+        id: "notif-limit-exceeded-" + Date.now(),
+        category: "System Warning",
+        title: "Daily Limit Reached",
+        description: `Your ${activePlan.toUpperCase()} plan daily quota has been reached.`,
+        time: "Just now",
+        severity: "CRITICAL",
+        isRead: false
+      };
+      setNotifications(prev => [limitNotif, ...prev]);
+      return;
+    }
+
     setIsAnalyzing(true);
     setResult(null);
     setError(null);
@@ -364,7 +441,10 @@ export default function App() {
       // Persistence
       const refreshedHistory = [completeResult, ...history.filter(h => h.messageText !== finalText)];
       setHistory(refreshedHistory);
-      localStorage.setItem("dogesh_premium_history", JSON.stringify(refreshedHistory));
+      await saveHistory(refreshedHistory);
+
+      // Increment daily limit usage
+      await usageService.incrementUsage(email);
 
       // Notification entry trigger
       const hasHighPressure = data.heuristicRiskRating > 50;
@@ -414,20 +494,126 @@ export default function App() {
     setNotifications(prev => [checkNotif, ...prev]);
   };
 
-  const handleDeleteHistoryTrace = (id: string, e: React.MouseEvent) => {
+  const handleLogin = async (email: string, password?: string): Promise<boolean> => {
+    try {
+      const response = await loginApi({ email, password: password || "password123" });
+      authLogin(response.data.token, response.data.user);
+      
+      // Switch storage strategy immediately
+      const parsed = await loadHistory();
+      setHistory(parsed);
+      
+      // Check if there's unsynced local history
+      const localLogs = await localHistoryService.loadHistory();
+      if (localLogs.length > 0) {
+        setShowImportPrompt(true);
+      }
+      
+      const loginNotif: SystemNotification = {
+        id: "notif-login-" + Date.now(),
+        category: "Authentication",
+        title: "Account Connected",
+        description: `Logged in as ${email}. Cloud history sync active.`,
+        time: "Just now",
+        severity: "LOW",
+        isRead: false
+      };
+      setNotifications(prev => [loginNotif, ...prev]);
+      return true;
+    } catch (err) {
+      console.error("Login failed:", err);
+      return false;
+    }
+  };
+
+  const handleRegister = async (name: string, email: string, password?: string): Promise<boolean> => {
+    try {
+      await registerApi({ 
+        fullName: name, 
+        email, 
+        password: password || "password123",
+        confirmPassword: password || "confirm123",
+        terms: true 
+      });
+      
+      // Log in immediately
+      const response = await loginApi({ email, password: password || "password123" });
+      authLogin(response.data.token, response.data.user);
+      
+      // Switch storage strategy immediately
+      const parsed = await loadHistory();
+      setHistory(parsed);
+      
+      const registerNotif: SystemNotification = {
+        id: "notif-register-" + Date.now(),
+        category: "Authentication",
+        title: "Account Created",
+        description: `Welcome ${name}! Your new Dogesh account is ready.`,
+        time: "Just now",
+        severity: "LOW",
+        isRead: false
+      };
+      setNotifications(prev => [registerNotif, ...prev]);
+      return true;
+    } catch (err) {
+      console.error("Registration failed:", err);
+      return false;
+    }
+  };
+
+  const handleLogout = async () => {
+    logout();
+    setShowImportPrompt(false);
+    
+    // Load local strategy history immediately
+    const parsed = await loadHistory();
+    setHistory(parsed);
+    navigate("/");
+  };
+
+  const handleUpgradePlan = async (plan: PlanType) => {
+    if (!user) return;
+    updateUserPlan(plan);
+    
+    const upgradeNotif: SystemNotification = {
+      id: "notif-upgrade-" + Date.now(),
+      category: "Billing",
+      title: `${plan.toUpperCase()} Plan Activated`,
+      description: `Your subscription has been successfully updated via Razorpay.`,
+      time: "Just now",
+      severity: "LOW",
+      isRead: false
+    };
+    setNotifications(prev => [upgradeNotif, ...prev]);
+  };
+
+  const handleImportHistory = async () => {
+    await importLocalHistoryToCloud();
+    setShowImportPrompt(false);
+    const mergedHistory = await loadHistory();
+    setHistory(mergedHistory);
+  };
+
+  const handleSkipImport = () => {
+    setShowImportPrompt(false);
+  };
+
+  const handleDeleteHistoryTrace = async (id: string, e: React.MouseEvent) => {
     e.stopPropagation();
     const refreshed = history.filter(h => h.id !== id);
     setHistory(refreshed);
-    localStorage.setItem("dogesh_premium_history", JSON.stringify(refreshed));
+    await saveHistory(refreshed);
     if (result?.id === id) {
       setResult(refreshed[0] || null);
     }
   };
 
-  const handlePurgeAllLocalCaches = () => {
-    if (window.confirm("Purge your entire local storage trace database immediate? This is irreversible.")) {
+  const handlePurgeAllLocalCaches = async () => {
+    const isCloud = isLoggedIn();
+    const targetName = isCloud ? "cloud database history" : "local storage trace database";
+    if (window.confirm(`Purge your entire ${targetName} immediately? This is irreversible.`)) {
       setHistory([]);
-      localStorage.removeItem("dogesh_premium_history");
+      await saveHistory([]);
       setResult(null);
       setMessageText("");
     }
@@ -469,6 +655,13 @@ export default function App() {
         clearAllNotifs={handleClearAllNotifChannels}
         onScanCTA={handleLaunchScanPage}
         isAlreadyOnScanScreen={activeTab === "workspace" && !result}
+        user={user}
+        onLogin={handleLogin}
+        onRegister={handleRegister}
+        onLogout={handleLogout}
+        onUpgradePlan={handleUpgradePlan}
+        usageCount={usageCount}
+        usageLimit={user ? PLAN_ENTITLEMENTS[user.plan].analysesPerDay : PLAN_ENTITLEMENTS[PlanType.SNIFF].analysesPerDay}
       />
 
       {/* ACTIVE PAGE CONTENT HUB */}
@@ -588,6 +781,17 @@ export default function App() {
                 textSize={textSize}
                 setTextSize={setTextSize}
                 onClearHistory={handlePurgeAllLocalCaches}
+                user={user}
+                onLogin={handleLogin}
+                onRegister={handleRegister}
+                onLogout={handleLogout}
+                onUpgradePlan={handleUpgradePlan}
+                localHistoryCount={localHistoryCount}
+                onImportHistory={handleImportHistory}
+                onSkipImport={handleSkipImport}
+                usageCount={usageCount}
+                usageLimit={user ? PLAN_ENTITLEMENTS[user.plan].analysesPerDay : PLAN_ENTITLEMENTS[PlanType.SNIFF].analysesPerDay}
+                showImportPrompt={showImportPrompt}
               />
             </motion.div>
           )}
@@ -603,5 +807,17 @@ export default function App() {
       </footer>
 
     </div>
+  );
+}
+
+export default function App() {
+  return (
+    <Routes>
+      <Route path="/" element={<DashboardView />} />
+      <Route path="/login" element={<Login />} />
+      <Route path="/register" element={<Register />} />
+      <Route path="/dashboard" element={<DashboardView />} />
+      <Route path="*" element={<Navigate to="/" />} />
+    </Routes>
   );
 }

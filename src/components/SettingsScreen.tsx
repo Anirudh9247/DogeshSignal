@@ -6,8 +6,14 @@ import {
   CheckCircle, 
   EyeOff, 
   Bell, 
-  ShieldCheck 
+  ShieldCheck,
+  User,
+  Key,
+  LogOut,
+  CreditCard,
+  AlertCircle
 } from "lucide-react";
+import { PlanType, UserProfile } from "../plans/plans";
 
 interface SettingsScreenProps {
   theme: "light" | "dark";
@@ -15,6 +21,17 @@ interface SettingsScreenProps {
   textSize: "sm" | "md" | "lg";
   setTextSize: (size: "sm" | "md" | "lg") => void;
   onClearHistory: () => void;
+  user: UserProfile | null;
+  onLogin: (email: string, password?: string) => Promise<boolean>;
+  onRegister: (name: string, email: string, password?: string) => Promise<boolean>;
+  onLogout: () => void;
+  onUpgradePlan: (plan: PlanType) => void;
+  localHistoryCount: number;
+  onImportHistory: () => void;
+  onSkipImport: () => void;
+  usageCount: number;
+  usageLimit: number;
+  showImportPrompt: boolean;
 }
 
 export function SettingsScreen({
@@ -22,7 +39,18 @@ export function SettingsScreen({
   toggleTheme,
   textSize,
   setTextSize,
-  onClearHistory
+  onClearHistory,
+  user,
+  onLogin,
+  onRegister,
+  onLogout,
+  onUpgradePlan,
+  localHistoryCount,
+  onImportHistory,
+  onSkipImport,
+  usageCount,
+  usageLimit,
+  showImportPrompt
 }: SettingsScreenProps) {
   const bgCardClass = theme === "dark"
     ? "bg-slate-900/60 border border-slate-800/80 backdrop-blur-md shadow-2xl"
@@ -30,11 +58,12 @@ export function SettingsScreen({
   const titleClass = theme === "dark" ? "text-slate-100" : "text-slate-900";
   const mutedClass = theme === "dark" ? "text-slate-400" : "text-slate-500";
   const labelClass = "text-[10px] font-mono font-bold tracking-widest text-slate-400 uppercase";
-
   // Notification Preferences State (simulated on-device state)
   const [allowSoundAlerts, setAllowSoundAlerts] = useState(true);
   const [allowCriticalAdvisories, setAllowCriticalAdvisories] = useState(true);
   const [allowWeeklyDigest, setAllowWeeklyDigest] = useState(false);
+  const [isSimulatingPayment, setIsSimulatingPayment] = useState(false);
+  const [loginEmail, setLoginEmail] = useState("");
 
   return (
     <div className="space-y-6 my-2 text-left" id="settings_screen_container">
@@ -61,6 +90,182 @@ export function SettingsScreen({
       
       {/* LEFT COLUMN: PREFERENCES & ACTIONS */}
       <div className="lg:col-span-6 space-y-6">
+
+        {/* CARD: Cloud Sync & Subscription */}
+        <div className={`p-6 rounded-2xl space-y-4.5 ${bgCardClass}`} id="cloud_sync_sub_card">
+          <div className="flex items-center gap-2 pb-3.5 border-b border-slate-150 dark:border-slate-800">
+            <ShieldCheck className="w-4.5 h-4.5 text-orange-500" />
+            <h3 className="text-xs font-sans font-bold tracking-wider uppercase text-slate-800 dark:text-slate-205">
+              Cloud Sync & Subscription
+            </h3>
+          </div>
+
+          {!user ? (
+            /* Logged out state - Simulation Inputs */
+            <div className="space-y-4 text-left">
+              <p className="text-[11px] text-slate-400 leading-relaxed font-sans">
+                You are currently exploring Dogesh Signal as a <strong>Guest</strong>. Your analyses are kept locally in your browser.
+              </p>
+              <div className="p-3 bg-orange-500/5 border border-orange-500/10 rounded-xl space-y-2">
+                <span className="text-[10px] font-mono font-bold text-orange-500 block uppercase tracking-wider">Guest Session Benefits</span>
+                <ul className="list-disc list-inside text-[10px] text-slate-400 space-y-1">
+                  <li>Up to 10 scans per day</li>
+                  <li>Local history logging</li>
+                  <li>Draft boundaries & replies</li>
+                </ul>
+              </div>
+              <p className="text-[10px] text-slate-500">
+                To sync your history permanently to the cloud, access plans and upgrade to premium, sign in or register an account.
+              </p>
+              <button
+                onClick={() => {
+                  const el = document.getElementById("navbar_profile_container");
+                  if (el) {
+                    el.scrollIntoView({ behavior: "smooth" });
+                    const btn = el.querySelector("button");
+                    if (btn) btn.click();
+                  }
+                }}
+                className="w-full py-2.5 bg-orange-500 hover:bg-orange-600 text-slate-950 font-sans font-bold text-xs rounded-xl transition-all cursor-pointer border-none text-center shadow-md flex items-center justify-center gap-1.5"
+              >
+                <User className="w-3.5 h-3.5" />
+                <span>Open Profile / Sign In Menu</span>
+              </button>
+            </div>
+          ) : (
+            /* Logged in info display */
+            <div className="space-y-4 text-left">
+              <div className="p-3.5 bg-slate-100 dark:bg-slate-950 border border-slate-200 dark:border-slate-850 rounded-xl space-y-2.5">
+                <div className="flex justify-between items-center text-[11px]">
+                  <span className="text-slate-400">Account:</span>
+                  <span className="font-mono font-bold text-slate-700 dark:text-slate-200">{user.email}</span>
+                </div>
+                <div className="flex justify-between items-center text-[11px]">
+                  <span className="text-slate-400">Subscription:</span>
+                  <span className="font-bold text-orange-500 uppercase font-mono">{user.plan}</span>
+                </div>
+                <div className="flex justify-between items-center text-[11px]">
+                  <span className="text-slate-400">Profile ID:</span>
+                  <span className="font-mono text-[9px] text-slate-400 truncate max-w-[150px]">{user.id}</span>
+                </div>
+              </div>
+
+              {/* Daily Limit Usage Progress */}
+              <div className="space-y-2">
+                <div className="flex justify-between items-center text-[10.5px]">
+                  <span className="text-slate-400">Daily Analysis Limit:</span>
+                  <span className="font-bold text-slate-600 dark:text-slate-300 font-mono">
+                    {usageCount} / {usageLimit === Infinity ? "Unlimited" : usageLimit} scans
+                  </span>
+                </div>
+                <div className="w-full h-2 bg-slate-100 dark:bg-slate-950 rounded-full overflow-hidden border border-slate-200 dark:border-slate-850">
+                  <div
+                    className={`h-full rounded-full transition-all duration-300 ${
+                      usageLimit === Infinity
+                        ? "bg-emerald-500"
+                        : usageCount >= usageLimit
+                        ? "bg-rose-500 animate-pulse"
+                        : usageCount > usageLimit * 0.75
+                        ? "bg-amber-500"
+                        : "bg-emerald-500"
+                    }`}
+                    style={{ width: `${usageLimit === Infinity ? 0 : Math.min((usageCount / usageLimit) * 100, 100)}%` }}
+                  />
+                </div>
+              </div>
+
+              {/* Guest to Account Sync/Import Prompt */}
+              {showImportPrompt && localHistoryCount > 0 && (
+                <div className="p-3 bg-amber-500/10 border border-amber-500/20 rounded-xl space-y-2.5">
+                  <div className="flex gap-2">
+                    <AlertCircle className="w-4 h-4 text-amber-500 shrink-0 mt-0.5" />
+                    <p className="text-[10.5px] leading-relaxed text-slate-500 dark:text-slate-350">
+                      <strong>Unsynced Data:</strong> You have <strong>{localHistoryCount}</strong> local scans. Import them to your cloud account?
+                    </p>
+                  </div>
+                  <div className="flex gap-2 justify-end">
+                    <button
+                      onClick={onSkipImport}
+                      className="px-2.5 py-1 text-[9px] font-mono uppercase font-bold text-slate-400 hover:text-slate-350 bg-transparent border-none cursor-pointer"
+                    >
+                      Skip
+                    </button>
+                    <button
+                      onClick={onImportHistory}
+                      className="px-3 py-1 bg-amber-500 hover:bg-amber-450 text-slate-950 text-[9.5px] font-mono font-bold uppercase rounded-lg border-none cursor-pointer"
+                    >
+                      Import
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {/* Upgrade Subscription Section (simulating Razorpay) */}
+              {user.plan !== PlanType.SHIELD && (
+                <div className="pt-2 border-t border-slate-100 dark:border-slate-900/60 space-y-2.5">
+                  <span className="text-[10px] font-mono font-bold text-slate-400 uppercase tracking-widest block">
+                    Upgrade Subscription
+                  </span>
+                  
+                  {isSimulatingPayment ? (
+                    <div className="p-3 bg-slate-950 rounded-xl border border-slate-850 flex flex-col items-center justify-center space-y-2 text-center">
+                      <span className="w-4 h-4 rounded-full border-2 border-orange-500 border-t-transparent animate-spin" />
+                      <span className="text-[10px] font-mono font-bold text-slate-450 uppercase tracking-wider">
+                        Connecting to Razorpay...
+                      </span>
+                    </div>
+                  ) : (
+                    <div className="flex flex-col sm:flex-row gap-2">
+                      {user.plan === PlanType.SNIFF && (
+                        <button
+                          onClick={() => {
+                            setIsSimulatingPayment(true);
+                            setTimeout(() => {
+                              setIsSimulatingPayment(false);
+                              onUpgradePlan(PlanType.GUARD);
+                            }, 1500);
+                          }}
+                          className="flex-grow py-2 px-3 bg-slate-100 hover:bg-slate-200 dark:bg-slate-950 dark:hover:bg-slate-900 border border-slate-200 dark:border-slate-850 rounded-xl text-[10px] font-mono font-bold uppercase text-slate-700 dark:text-slate-200 flex items-center justify-center gap-1 cursor-pointer"
+                        >
+                          <CreditCard className="w-3.5 h-3.5 text-orange-500" />
+                          <span>Guard (USD 9.99/mo)</span>
+                        </button>
+                      )}
+                      <button
+                        onClick={() => {
+                          setIsSimulatingPayment(true);
+                          setTimeout(() => {
+                            setIsSimulatingPayment(false);
+                            onUpgradePlan(PlanType.SHIELD);
+                          }, 1500);
+                        }}
+                        className="flex-grow py-2 px-3 bg-orange-500 hover:bg-orange-450 text-slate-950 rounded-xl text-[10px] font-mono font-black uppercase tracking-wider flex items-center justify-center gap-1 cursor-pointer border-none"
+                      >
+                        <CreditCard className="w-3.5 h-3.5 text-slate-950" />
+                        <span>Shield (USD 29.99/mo)</span>
+                      </button>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* Log out option */}
+              <div className="pt-2.5 border-t border-slate-100 dark:border-slate-900/60 flex justify-between items-center">
+                <span className="text-[9.5px] font-mono text-emerald-500 uppercase tracking-wider font-extrabold flex items-center gap-1.5 select-none">
+                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                  Cloud active
+                </span>
+                <button
+                  onClick={onLogout}
+                  className="px-3 py-1.5 bg-rose-500/10 hover:bg-rose-500/15 text-rose-500 rounded-lg font-mono text-[9.5px] uppercase font-bold border border-rose-500/10 cursor-pointer flex items-center gap-1"
+                >
+                  <LogOut className="w-3 h-3" />
+                  <span>Disconnect</span>
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
 
         {/* Default Settings Status Card */}
         <div className={`p-6 rounded-2xl space-y-4 ${bgCardClass}`} id="settings_preset_default_status">

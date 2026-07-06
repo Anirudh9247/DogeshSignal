@@ -10,9 +10,14 @@ import {
   Clock,
   Settings,
   Shield,
-  Layers
+  Layers,
+  User,
+  LogOut,
+  AlertCircle,
+  CreditCard
 } from "lucide-react";
 import { SystemNotification } from "../types";
+import { UserProfile, PlanType } from "../plans/plans";
 
 interface NavbarProps {
   theme: "light" | "dark";
@@ -25,6 +30,15 @@ interface NavbarProps {
   clearAllNotifs: () => void;
   onScanCTA: () => void;
   isAlreadyOnScanScreen: boolean;
+  
+  // Authentication properties
+  user: UserProfile | null;
+  onLogin: (email: string, password?: string) => Promise<boolean>;
+  onRegister: (name: string, email: string, password?: string) => Promise<boolean>;
+  onLogout: () => void;
+  onUpgradePlan: (plan: PlanType) => void;
+  usageCount: number;
+  usageLimit: number;
 }
 
 export function Navbar({
@@ -34,9 +48,33 @@ export function Navbar({
   setActiveTab,
   notifications,
   onScanCTA,
-  isAlreadyOnScanScreen
+  isAlreadyOnScanScreen,
+  user,
+  onLogin,
+  onRegister,
+  onLogout,
+  onUpgradePlan,
+  usageCount,
+  usageLimit
 }: NavbarProps) {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const [isProfileOpen, setIsProfileOpen] = useState(false);
+  const [authMode, setAuthMode] = useState<"login" | "register">("login");
+  
+  // Login form states
+  const [loginEmail, setLoginEmail] = useState("");
+  const [loginPassword, setLoginPassword] = useState("");
+  
+  // Register form states
+  const [regName, setRegName] = useState("");
+  const [regEmail, setRegEmail] = useState("");
+  const [regPassword, setRegPassword] = useState("");
+  const [regConfirmPassword, setRegConfirmPassword] = useState("");
+  const [regTerms, setRegTerms] = useState(false);
+
+  // Status/loading states
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [authError, setAuthError] = useState<string | null>(null);
   const unreadCount = notifications.filter(n => !n.isRead).length;
 
   // Grouped logically: Marketing/Discover links vs Core Utility App Tasks
@@ -182,6 +220,293 @@ export function Navbar({
           >
             {theme === "dark" ? <Sun className="w-3.5 h-3.5" /> : <Moon className="w-3.5 h-3.5" />}
           </button>
+
+          {/* Unified Profile/Auth button & dropdown */}
+          <div className="relative" id="navbar_profile_container">
+            <button
+              onClick={() => setIsProfileOpen(!isProfileOpen)}
+              className={`p-2 rounded-xl border transition-colors cursor-pointer flex items-center justify-center gap-1.5 ${
+                theme === "dark" 
+                  ? "bg-slate-900 border-slate-800 text-slate-350 hover:bg-slate-850" 
+                  : "bg-white border-slate-200 text-slate-600 hover:bg-slate-50 shadow-3xs"
+              }`}
+              title="Profile / Sign In"
+            >
+              {user ? (
+                <div className="flex items-center gap-1.5">
+                  <div className="w-4.5 h-4.5 rounded-full bg-orange-500 text-slate-950 flex items-center justify-center text-[10px] font-bold">
+                    {user.email.slice(0, 1).toUpperCase()}
+                  </div>
+                  <span className="text-[10px] font-mono font-bold hidden lg:inline truncate max-w-[80px]">
+                    {user.email.split("@")[0]}
+                  </span>
+                </div>
+              ) : (
+                <div className="flex items-center gap-1.5">
+                  <User className="w-3.5 h-3.5 text-orange-500" />
+                  <span className="text-[10px] font-sans font-bold hidden lg:inline">Sign In</span>
+                </div>
+              )}
+            </button>
+
+            <AnimatePresence>
+              {isProfileOpen && (
+                <motion.div
+                  initial={{ opacity: 0, y: 10, scale: 0.95 }}
+                  animate={{ opacity: 1, y: 0, scale: 1 }}
+                  exit={{ opacity: 0, y: 10, scale: 0.95 }}
+                  transition={{ duration: 0.15 }}
+                  className={`absolute right-0 mt-2.5 w-76 sm:w-80 rounded-2xl border p-4 shadow-2xl z-50 text-left ${
+                    theme === "dark" 
+                      ? "bg-slate-900/95 border-slate-800 text-slate-200 backdrop-blur-lg" 
+                      : "bg-white border-slate-200 text-slate-800 shadow-xl"
+                  }`}
+                >
+                  {user ? (
+                    // Logged in UI
+                    <div className="space-y-4 font-sans text-xs">
+                      <div className="border-b border-slate-100 dark:border-slate-800 pb-3">
+                        <span className="text-[9px] font-mono font-bold text-orange-500 uppercase tracking-wider block">Logged In Profile</span>
+                        <h4 className="font-bold text-sm text-slate-900 dark:text-slate-100 truncate mt-0.5" title={user.email}>{user.email}</h4>
+                        <span className="text-[10px] text-slate-400 dark:text-slate-500 mt-1 inline-block">Plan: {user.plan.toUpperCase()}</span>
+                      </div>
+                      
+                      {/* Daily scan quota progress */}
+                      <div className="space-y-1.5">
+                        <div className="flex justify-between text-[10px] font-mono font-bold text-slate-400">
+                          <span>DAILY SCANS</span>
+                          <span>{usageCount} / {usageLimit === Infinity ? "∞" : usageLimit}</span>
+                        </div>
+                        <div className="w-full h-1 bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden">
+                          <div 
+                            className={`h-full rounded-full ${usageCount >= usageLimit ? "bg-rose-500" : "bg-emerald-500"}`}
+                            style={{ width: `${usageLimit === Infinity ? 0 : Math.min((usageCount / usageLimit) * 100, 100)}%` }}
+                          />
+                        </div>
+                      </div>
+
+                      {/* Upgrade Plan Buttons inside Profile */}
+                      {user.plan !== PlanType.SHIELD && (
+                        <div className="space-y-2 border-t border-slate-100 dark:border-slate-800 pt-3">
+                          <span className="text-[9px] font-mono font-bold text-slate-400 uppercase tracking-wider block">Simulated billing</span>
+                          <div className="flex gap-2">
+                            {user.plan === PlanType.SNIFF && (
+                              <button
+                                onClick={() => onUpgradePlan(PlanType.GUARD)}
+                                className="flex-grow py-1.5 px-2 bg-slate-100 dark:bg-slate-950 border border-slate-200 dark:border-slate-850 hover:bg-slate-200 dark:hover:bg-slate-800 rounded-lg text-[9px] font-mono font-bold text-slate-700 dark:text-slate-350 cursor-pointer"
+                              >
+                                Upgrade Guard
+                              </button>
+                            )}
+                            <button
+                              onClick={() => onUpgradePlan(PlanType.SHIELD)}
+                              className="flex-grow py-1.5 px-2 bg-orange-500 hover:bg-orange-600 text-slate-950 rounded-lg text-[9px] font-mono font-bold cursor-pointer border-none"
+                            >
+                              Upgrade Shield
+                            </button>
+                          </div>
+                        </div>
+                      )}
+
+                      <button
+                        onClick={() => {
+                          onLogout();
+                          setIsProfileOpen(false);
+                        }}
+                        className="w-full py-2 bg-rose-500/10 hover:bg-rose-500/15 text-rose-500 border border-rose-500/10 rounded-xl font-mono text-[10px] font-bold uppercase tracking-wider text-center flex items-center justify-center gap-1.5 cursor-pointer mt-1"
+                      >
+                        <LogOut className="w-3.5 h-3.5" />
+                        <span>Disconnect Account</span>
+                      </button>
+                    </div>
+                  ) : (
+                    // Unified Login / Register Form
+                    <div className="space-y-4 font-sans text-xs">
+                      {/* Tabs */}
+                      <div className="flex bg-slate-100 dark:bg-slate-950 p-1 rounded-xl border border-slate-200/50 dark:border-slate-850 select-none">
+                        <button
+                          onClick={() => { setAuthMode("login"); setAuthError(null); }}
+                          className={`flex-1 text-center py-1 rounded-lg text-[10px] font-bold cursor-pointer transition-all ${
+                            authMode === "login" 
+                              ? "bg-white dark:bg-slate-900 text-slate-905 dark:text-slate-100 border border-slate-200/40 dark:border-slate-800 shadow-3xs" 
+                              : "text-slate-400 hover:text-slate-900 dark:hover:text-slate-200"
+                          }`}
+                        >
+                          Login
+                        </button>
+                        <button
+                          onClick={() => { setAuthMode("register"); setAuthError(null); }}
+                          className={`flex-1 text-center py-1 rounded-lg text-[10px] font-bold cursor-pointer transition-all ${
+                            authMode === "register" 
+                              ? "bg-white dark:bg-slate-900 text-slate-905 dark:text-slate-100 border border-slate-200/40 dark:border-slate-800 shadow-3xs" 
+                              : "text-slate-400 hover:text-slate-900 dark:hover:text-slate-200"
+                          }`}
+                        >
+                          Register
+                        </button>
+                      </div>
+
+                      {authError && (
+                        <p className="text-rose-550 text-[10px] font-mono leading-relaxed bg-rose-500/5 border border-rose-500/10 p-2 rounded-lg">
+                          {authError}
+                        </p>
+                      )}
+
+                      {authMode === "login" ? (
+                        // Login Fields
+                        <div className="space-y-3">
+                          <div className="space-y-1">
+                            <label className="text-[10px] font-mono font-bold text-slate-400 uppercase tracking-wider">Email Address</label>
+                            <input
+                              type="email"
+                              placeholder="you@domain.com"
+                              value={loginEmail}
+                              onChange={(e) => setLoginEmail(e.target.value)}
+                              className="w-full rounded-xl border border-slate-200 dark:border-slate-850 bg-slate-50 dark:bg-slate-950 px-3 py-2 text-xs outline-none focus:border-orange-500/50 text-slate-800 dark:text-slate-100"
+                            />
+                          </div>
+                          <div className="space-y-1">
+                            <label className="text-[10px] font-mono font-bold text-slate-400 uppercase tracking-wider">Password</label>
+                            <input
+                              type="password"
+                              placeholder="••••••••"
+                              value={loginPassword}
+                              onChange={(e) => setLoginPassword(e.target.value)}
+                              className="w-full rounded-xl border border-slate-200 dark:border-slate-850 bg-slate-50 dark:bg-slate-950 px-3 py-2 text-xs outline-none focus:border-orange-500/50 text-slate-800 dark:text-slate-100"
+                            />
+                          </div>
+                          <button
+                            disabled={isSubmitting}
+                            onClick={async () => {
+                              if (!loginEmail.trim() || !loginPassword) {
+                                setAuthError("Please fill all fields");
+                                return;
+                              }
+                              setIsSubmitting(true);
+                              setAuthError(null);
+                              const ok = await onLogin(loginEmail.trim(), loginPassword);
+                              setIsSubmitting(false);
+                              if (ok) {
+                                setIsProfileOpen(false);
+                                setLoginPassword("");
+                              } else {
+                                setAuthError("Invalid credentials");
+                              }
+                            }}
+                            className="w-full py-2 px-3 bg-orange-500 hover:bg-orange-600 disabled:opacity-50 text-slate-950 font-sans font-bold text-xs rounded-xl cursor-pointer border-none transition-all flex items-center justify-center gap-1.5 shadow-sm"
+                          >
+                            {isSubmitting ? "Logging in..." : "Log In"}
+                          </button>
+                        </div>
+                      ) : (
+                        // Register Fields
+                        <div className="space-y-3">
+                          <div className="space-y-1">
+                            <label className="text-[10px] font-mono font-bold text-slate-400 uppercase tracking-wider">Full Name</label>
+                            <input
+                              type="text"
+                              placeholder="Your Name"
+                              value={regName}
+                              onChange={(e) => setRegName(e.target.value)}
+                              className="w-full rounded-xl border border-slate-200 dark:border-slate-850 bg-slate-50 dark:bg-slate-950 px-3 py-2 text-xs outline-none focus:border-orange-500/50 text-slate-800 dark:text-slate-100"
+                            />
+                          </div>
+                          <div className="space-y-1">
+                            <label className="text-[10px] font-mono font-bold text-slate-400 uppercase tracking-wider">Email Address</label>
+                            <input
+                              type="email"
+                              placeholder="you@domain.com"
+                              value={regEmail}
+                              onChange={(e) => setRegEmail(e.target.value)}
+                              className="w-full rounded-xl border border-slate-200 dark:border-slate-855 bg-slate-50 dark:bg-slate-955 px-3 py-2 text-xs outline-none focus:border-orange-500/50 text-slate-800 dark:text-slate-100"
+                            />
+                          </div>
+                          <div className="space-y-1">
+                            <label className="text-[10px] font-mono font-bold text-slate-400 uppercase tracking-wider">Password</label>
+                            <input
+                              type="password"
+                              placeholder="Min. 8 characters"
+                              value={regPassword}
+                              onChange={(e) => setRegPassword(e.target.value)}
+                              className="w-full rounded-xl border border-slate-200 dark:border-slate-855 bg-slate-50 dark:bg-slate-955 px-3 py-2 text-xs outline-none focus:border-orange-500/50 text-slate-800 dark:text-slate-100"
+                            />
+                          </div>
+                          <div className="space-y-1">
+                            <label className="text-[10px] font-mono font-bold text-slate-400 uppercase tracking-wider">Confirm Password</label>
+                            <input
+                              type="password"
+                              placeholder="••••••••"
+                              value={regConfirmPassword}
+                              onChange={(e) => setRegConfirmPassword(e.target.value)}
+                              className="w-full rounded-xl border border-slate-200 dark:border-slate-855 bg-slate-50 dark:bg-slate-955 px-3 py-2 text-xs outline-none focus:border-orange-500/50 text-slate-800 dark:text-slate-100"
+                            />
+                          </div>
+                          <label className="flex items-center gap-2 text-[10px] text-slate-450 select-none">
+                            <input
+                              type="checkbox"
+                              checked={regTerms}
+                              onChange={(e) => setRegTerms(e.target.checked)}
+                              className="accent-orange-500 rounded"
+                            />
+                            I agree to Terms & Conditions
+                          </label>
+                          <button
+                            disabled={isSubmitting}
+                            onClick={async () => {
+                              if (!regName.trim() || !regEmail.trim() || !regPassword || !regConfirmPassword) {
+                                setAuthError("Please fill all fields");
+                                return;
+                              }
+                              if (regPassword !== regConfirmPassword) {
+                                setAuthError("Passwords do not match");
+                                return;
+                              }
+                              if (regPassword.length < 8) {
+                                setAuthError("Password must be at least 8 characters");
+                                return;
+                              }
+                              if (!regTerms) {
+                                setAuthError("Must accept Terms & Conditions");
+                                return;
+                              }
+                              setIsSubmitting(true);
+                              setAuthError(null);
+                              const ok = await onRegister(regName.trim(), regEmail.trim(), regPassword);
+                              setIsSubmitting(false);
+                              if (ok) {
+                                setIsProfileOpen(false);
+                                setRegName("");
+                                setRegEmail("");
+                                setRegPassword("");
+                                setRegConfirmPassword("");
+                                setRegTerms(false);
+                              } else {
+                                setAuthError("Registration failed");
+                              }
+                            }}
+                            className="w-full py-2 px-3 bg-orange-500 hover:bg-orange-600 disabled:opacity-50 text-slate-950 font-sans font-bold text-xs rounded-xl cursor-pointer border-none transition-all flex items-center justify-center gap-1.5 shadow-sm"
+                          >
+                            {isSubmitting ? "Creating Account..." : "Create Account"}
+                          </button>
+                        </div>
+                      )}
+                      
+                      <div className="border-t border-slate-100 dark:border-slate-800 pt-2.5 flex items-center justify-between">
+                        <span className="text-[10px] text-slate-400">Try features as guest</span>
+                        <button
+                          type="button"
+                          onClick={() => setIsProfileOpen(false)}
+                          className="px-2.5 py-1 bg-slate-100 hover:bg-slate-200 dark:bg-slate-950 dark:hover:bg-slate-800 border border-slate-200 dark:border-slate-850 rounded-lg text-[9px] font-sans font-bold text-slate-600 dark:text-slate-350 cursor-pointer"
+                        >
+                          Guest Access
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                </motion.div>
+              )}
+            </AnimatePresence>
+          </div>
 
           {/* Secure indicator light */}
           <div className="hidden lg:flex items-center gap-1.5 pl-2 border-l border-slate-200 dark:border-slate-800 select-none">
