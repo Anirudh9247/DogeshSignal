@@ -61,8 +61,8 @@ export function ResultsDashboard({
   onCopyAllResults,
   isAllCopied
 }: ResultsDashboardProps) {
-  // Use sentence-case Tone matching direct and professional mapped to the original state
-  const [activeReplyTone, setActiveReplyTone] = useState<"Professional" | "Direct">("Professional");
+  const [activeReplyTone, setActiveReplyTone] = useState<"Professional" | "Direct" | "Supportive">("Professional");
+  const [editedReplyText, setEditedReplyText] = useState("");
   const [copiedKey, setCopiedKey] = useState<string | null>(null);
 
   const textTitleClass = theme === "dark" ? "text-slate-100" : "text-slate-900";
@@ -72,16 +72,22 @@ export function ResultsDashboard({
     ? "bg-slate-900/60 border border-slate-800/80 backdrop-blur-md shadow-2xl transition-all duration-200"
     : "bg-white border border-slate-200 shadow-sm transition-all duration-200 hover:shadow-md";
 
+  const repliesMap = {
+    Professional: result.replies?.professional,
+    Direct: result.replies?.bold,
+    Supportive: result.replies?.supportive
+  };
+
+  useEffect(() => {
+    if (result) {
+      setEditedReplyText(repliesMap[activeReplyTone] || "");
+    }
+  }, [activeReplyTone, result]);
+
   const handleCopyReplyText = (text: string, tone: string) => {
     navigator.clipboard.writeText(text);
     setCopiedKey(tone);
     setTimeout(() => setCopiedKey(null), 1800);
-  };
-
-  // Map sentence-case UI selections to types-safe backing fields
-  const repliesMap = {
-    Professional: result.replies?.professional,
-    Direct: result.replies?.bold
   };
 
   const handleExportPDF = () => {
@@ -611,9 +617,9 @@ export function ResultsDashboard({
               Choose a tone, then edit the reply to fit your situation.
             </p>
 
-            {/* Tone option tabs (Professional vs Direct sentence-case) */}
+            {/* Tone option tabs (Professional, Direct, Supportive sentence-case) */}
             <div className="p-1 bg-slate-100 dark:bg-slate-950 rounded-xl border border-slate-200 dark:border-slate-850 font-sans text-xs select-none flex">
-              {(["Professional", "Direct"] as const).map((tone) => {
+              {(["Professional", "Direct", "Supportive"] as const).map((tone) => {
                 const isActive = activeReplyTone === tone;
                 return (
                   <button
@@ -631,35 +637,70 @@ export function ResultsDashboard({
               })}
             </div>
 
-            {/* Render selected reply */}
-            {repliesMap[activeReplyTone] && (
-              <div className={`p-4 rounded-xl border space-y-4 relative ${
-                theme === "dark" ? "bg-slate-950/60 border-slate-850" : "bg-slate-50 border-slate-200"
-              }`}>
-                <p className={`text-xs leading-relaxed italic ${theme === "dark" ? "text-slate-200 font-sans" : "text-slate-800 font-medium"}`}>
-                  "{repliesMap[activeReplyTone]}"
-                </p>
+            {/* Render selected reply inside editable textarea */}
+            <div className={`p-4 rounded-xl border space-y-4 relative ${
+              theme === "dark" ? "bg-slate-950/60 border-slate-850" : "bg-slate-50 border-slate-200"
+            }`}>
+              <textarea
+                value={editedReplyText}
+                onChange={(e) => setEditedReplyText(e.target.value)}
+                className={`w-full min-h-[110px] rounded-xl border p-3.5 text-xs outline-none focus:border-orange-500/50 transition-all font-sans leading-relaxed resize-y ${
+                  theme === "dark" 
+                    ? "bg-slate-950/40 border-slate-850 text-slate-200 focus:bg-slate-950" 
+                    : "bg-white border-slate-250 text-slate-800 focus:bg-white"
+                }`}
+                placeholder="Choose a tone above..."
+              />
 
-                <div className="flex items-center justify-end pt-3 border-t border-slate-150 dark:border-slate-900/60 font-sans">
-                  <button
-                    onClick={() => handleCopyReplyText(repliesMap[activeReplyTone] || "", activeReplyTone)}
-                    className="px-4 py-1.5 bg-orange-500 hover:bg-orange-600 text-slate-950 font-sans font-semibold text-xs rounded-lg cursor-pointer transition-all flex items-center justify-center gap-1 border-none shadow-sm"
-                  >
-                    {copiedKey === activeReplyTone ? (
-                      <>
-                        <Check className="w-3.5 h-3.5 text-slate-950" />
-                        <span>Copied</span>
-                      </>
-                    ) : (
-                      <>
-                        <Copy className="w-3.5 h-3.5 text-slate-950" />
-                        <span>Copy reply</span>
-                      </>
-                    )}
-                  </button>
-                </div>
+              {/* User quick customization helpers */}
+              <div className="flex flex-wrap gap-1.5 pt-1.5 select-none font-sans">
+                <button
+                  onClick={() => setEditedReplyText(prev => prev + "\n\nBest regards,\n[Your Name]")}
+                  className="px-2.5 py-1 rounded-lg border border-slate-200 dark:border-slate-800 hover:bg-slate-100 dark:hover:bg-slate-900 text-[10px] font-semibold text-slate-500 dark:text-slate-400 cursor-pointer transition-colors"
+                  title="Append professional email signature"
+                >
+                  + Add Signature
+                </button>
+                <button
+                  onClick={() => {
+                    const sentences = editedReplyText.split(". ");
+                    if (sentences.length > 2) {
+                      setEditedReplyText(sentences.slice(0, 2).join(". ") + (sentences[1].endsWith(".") ? "" : "."));
+                    }
+                  }}
+                  className="px-2.5 py-1 rounded-lg border border-slate-200 dark:border-slate-800 hover:bg-slate-100 dark:hover:bg-slate-900 text-[10px] font-semibold text-slate-500 dark:text-slate-400 cursor-pointer transition-colors"
+                  title="Trim reply to first two sentences"
+                >
+                  ⚡ Make Shorter
+                </button>
+                <button
+                  onClick={() => setEditedReplyText(prev => prev + "\n\nLet me know if we can schedule a quick call to align on this.")}
+                  className="px-2.5 py-1 rounded-lg border border-slate-200 dark:border-slate-800 hover:bg-slate-100 dark:hover:bg-slate-900 text-[10px] font-semibold text-slate-500 dark:text-slate-400 cursor-pointer transition-colors"
+                  title="Append meeting scheduling request"
+                >
+                  📅 Ask for Call
+                </button>
               </div>
-            )}
+
+              <div className="flex items-center justify-end pt-3 border-t border-slate-150 dark:border-slate-900/60 font-sans">
+                <button
+                  onClick={() => handleCopyReplyText(editedReplyText, activeReplyTone)}
+                  className="px-4 py-1.5 bg-orange-500 hover:bg-orange-600 text-slate-950 font-sans font-semibold text-xs rounded-lg cursor-pointer transition-all flex items-center justify-center gap-1 border-none shadow-sm"
+                >
+                  {copiedKey === activeReplyTone ? (
+                    <>
+                      <Check className="w-3.5 h-3.5 text-slate-950" />
+                      <span>Copied</span>
+                    </>
+                  ) : (
+                    <>
+                      <Copy className="w-3.5 h-3.5 text-slate-950" />
+                      <span>Copy reply</span>
+                    </>
+                  )}
+                </button>
+              </div>
+            </div>
           </div>
 
           <div className={`p-6 sm:p-7 rounded-2xl ${bgCardClass} space-y-4`} id="card_recommended_boundaries">
