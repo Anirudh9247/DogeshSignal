@@ -20,9 +20,10 @@ import Login from "./pages/Login";
 import Register from "./pages/Register";
 import { login as loginApi, register as registerApi } from "./services/authService";
 
-// Services
-import { analyzeMessage } from "./services/analysisService";
-import { saveHistory, loadHistory, importLocalHistoryToCloud } from "./services/historyService";
+// Hooks & Services
+import { useScan } from "./hooks/useScan";
+import { useHistory } from "./hooks/useHistory";
+import { importLocalHistoryToCloud } from "./services/historyService";
 import { PlanType, UserProfile, getMockUser, isLoggedIn } from "./plans/plans";
 import { PLAN_ENTITLEMENTS } from "./plans/entitlements";
 import { usageService } from "./services/usageService";
@@ -209,23 +210,40 @@ function DashboardView() {
     }
   };
 
-  // Input states
-  const [messageText, setMessageText] = useState("");
+  // Input and analysis states via useScan hook
+  const {
+    messageText,
+    setMessageText,
+    isAnalyzing,
+    result,
+    setResult,
+    error,
+    setError,
+    activeDogLog,
+    setActiveDogLog,
+    triggerScan
+  } = useScan();
+
+  // History state via useHistory hook
+  const {
+    history,
+    setHistory,
+    searchQuery,
+    setSearchQuery,
+    historyFilter,
+    setHistoryFilter,
+    fetchHistory,
+    updateHistory,
+    getFilteredHistory
+  } = useHistory();
+
   const [selectedContext, setSelectedContext] = useState("All Contexts");
-  const [isAnalyzing, setIsAnalyzing] = useState(false);
-  // Loaded result state
-  const [result, setResult] = useState<AnalysisResult | null>(null);
-  const [history, setHistory] = useState<AnalysisResult[]>([]);
-  const [searchQuery, setSearchQuery] = useState("");
-  const [historyFilter, setHistoryFilter] = useState("ALL");
   const [isAllCopied, setIsAllCopied] = useState(false);
 
   // Authentication & Usage tracking states
   const [localHistoryCount, setLocalHistoryCount] = useState(0);
   const [usageCount, setUsageCount] = useState(0);
   const [showImportPrompt, setShowImportPrompt] = useState(false);
-  const [activeDogLog, setActiveDogLog] = useState("Ready to analyze a message.");
-  const [error, setError] = useState<string | null>(null);
 
 
 
@@ -260,14 +278,6 @@ function DashboardView() {
     }
   ]);
 
-  const loadingMessages = [
-    "Checking message text...",
-    "Looking for high-pressure requests & sudden urgencies...",
-    "Highlighting emotional triggers & missing boundaries...",
-    "Checking details on timelines & commitments...",
-    "Drafting respectful & firm boundary replies..."
-  ];
-
   // Load preferences and history cache on mount
   useEffect(() => {
     const savedTheme = localStorage.getItem("dogesh_premium_theme");
@@ -279,13 +289,9 @@ function DashboardView() {
 
     const initHistoryAndCheckSync = async () => {
       try {
-        // Load active history via strategy facade (local vs supabase)
-        const parsed = await loadHistory();
-        if (parsed.length > 0) {
-          setHistory(parsed);
-        } else {
-          setHistory(DEFAULT_HISTORY_ITEMS);
-          await saveHistory(DEFAULT_HISTORY_ITEMS);
+        const parsed = await fetchHistory();
+        if (parsed.length === 0) {
+          await updateHistory(DEFAULT_HISTORY_ITEMS);
         }
 
         // Edge Case: Guest -> Login Sync Prompt
@@ -298,14 +304,12 @@ function DashboardView() {
             );
             if (shouldImport) {
               await importLocalHistoryToCloud();
-              const mergedHistory = await loadHistory();
-              setHistory(mergedHistory);
+              await fetchHistory();
             }
           }
         }
       } catch (e) {
-        setHistory(DEFAULT_HISTORY_ITEMS);
-        await saveHistory(DEFAULT_HISTORY_ITEMS);
+        await updateHistory(DEFAULT_HISTORY_ITEMS);
       }
     };
 
@@ -379,9 +383,9 @@ function DashboardView() {
       return;
     }
 
-    const user = getMockUser();
-    const activePlan = user ? user.plan : PlanType.SNIFF;
-    const email = user ? user.email : null;
+    const userObj = getMockUser();
+    const activePlan = userObj ? userObj.plan : PlanType.SNIFF;
+    const email = userObj ? userObj.email : null;
     const canScan = await usageService.checkDailyLimit(email, activePlan);
     if (!canScan) {
       setError(`Daily limit reached for ${activePlan.toUpperCase()} plan. Upgrade or try again tomorrow!`);
@@ -399,54 +403,15 @@ function DashboardView() {
       return;
     }
 
-    setIsAnalyzing(true);
-    setResult(null);
-    setError(null);
-    setActiveDogLog(loadingMessages[0]);
-
-    // Simple loading animation interval simulation
-    let msgIndex = 0;
-    const interval = setInterval(() => {
-      msgIndex++;
-      if (msgIndex < loadingMessages.length) {
-        setActiveDogLog(loadingMessages[msgIndex]);
-      }
-    }, 900);
-
     try {
-      const response = await fetch("/api/analyze", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ message: finalText, enableReplyForge: true }),
-      });
+      const data = await triggerScan(finalText);
+      if (!data) return;
 
-      if (!response.ok) {
-        throw new Error(`Analyze API failed with status ${response.status}`);
-      }
+      const refreshedHistory = [data, ...history.filter(h => h.messageText !== finalText)];
+      await updateHistory(refreshedHistory);
 
-      const data: AnalysisResult = await response.json();
-
-      const completeResult: AnalysisResult = {
-        ...data,
-        id: crypto.randomUUID(),
-        timestamp: new Date().toLocaleDateString(undefined, { 
-          month: "short", 
-          day: "numeric", 
-          hour: "2-digit", 
-          minute: "2-digit" 
-        }),
-        messageText: finalText
-      };
-
-      // Persistence
-      const refreshedHistory = [completeResult, ...history.filter(h => h.messageText !== finalText)];
-      setHistory(refreshedHistory);
-      await saveHistory(refreshedHistory);
-
-      // Increment daily limit usage
       await usageService.incrementUsage(email);
 
-      // Notification entry trigger
       const hasHighPressure = data.heuristicRiskRating > 50;
       const notif: SystemNotification = {
          id: "notif-vetted-" + Date.now(),
@@ -458,14 +423,8 @@ function DashboardView() {
          isRead: false
       };
       setNotifications(prev => [notif, ...prev]);
-
-      setResult(completeResult);
     } catch (err: any) {
       console.error(err);
-      setError(err?.message || "There was a routing problem with the AI vetting api. Please try again.");
-    } finally {
-      clearInterval(interval);
-      setIsAnalyzing(false);
     }
   };
 
@@ -500,8 +459,7 @@ function DashboardView() {
       authLogin(response.data.token, response.data.user);
       
       // Switch storage strategy immediately
-      const parsed = await loadHistory();
-      setHistory(parsed);
+      await fetchHistory();
       
       // Check if there's unsynced local history
       const localLogs = await localHistoryService.loadHistory();
@@ -541,8 +499,7 @@ function DashboardView() {
       authLogin(response.data.token, response.data.user);
       
       // Switch storage strategy immediately
-      const parsed = await loadHistory();
-      setHistory(parsed);
+      await fetchHistory();
       
       const registerNotif: SystemNotification = {
         id: "notif-register-" + Date.now(),
@@ -566,8 +523,7 @@ function DashboardView() {
     setShowImportPrompt(false);
     
     // Load local strategy history immediately
-    const parsed = await loadHistory();
-    setHistory(parsed);
+    await fetchHistory();
     navigate("/");
   };
 
@@ -590,8 +546,7 @@ function DashboardView() {
   const handleImportHistory = async () => {
     await importLocalHistoryToCloud();
     setShowImportPrompt(false);
-    const mergedHistory = await loadHistory();
-    setHistory(mergedHistory);
+    await fetchHistory();
   };
 
   const handleSkipImport = () => {
@@ -601,8 +556,7 @@ function DashboardView() {
   const handleDeleteHistoryTrace = async (id: string, e: React.MouseEvent) => {
     e.stopPropagation();
     const refreshed = history.filter(h => h.id !== id);
-    setHistory(refreshed);
-    await saveHistory(refreshed);
+    await updateHistory(refreshed);
     if (result?.id === id) {
       setResult(refreshed[0] || null);
     }
@@ -612,8 +566,7 @@ function DashboardView() {
     const isCloud = isLoggedIn();
     const targetName = isCloud ? "cloud database history" : "local storage trace database";
     if (window.confirm(`Purge your entire ${targetName} immediately? This is irreversible.`)) {
-      setHistory([]);
-      await saveHistory([]);
+      await updateHistory([]);
       setResult(null);
       setMessageText("");
     }
