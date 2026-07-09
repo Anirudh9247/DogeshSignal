@@ -428,7 +428,7 @@ function DashboardView() {
 
       const completeResult: AnalysisResult = {
         ...data,
-        id: "scan-" + Date.now(),
+        id: crypto.randomUUID(),
         timestamp: new Date().toLocaleDateString(undefined, { 
           month: "short", 
           day: "numeric", 

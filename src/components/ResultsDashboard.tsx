@@ -17,6 +17,10 @@ import {
 } from "lucide-react";
 import { AnalysisResult, MicroFeatures } from "../types/analysis";
 import { jsPDF } from "jspdf";
+import { useAuth } from "../context/AuthContext";
+import { PLAN_ENTITLEMENTS } from "../plans/entitlements";
+import { PlanType } from "../plans/plans";
+import toast from "react-hot-toast";
 
 
 // Subtle score reveal counter
@@ -61,6 +65,10 @@ export function ResultsDashboard({
   onCopyAllResults,
   isAllCopied
 }: ResultsDashboardProps) {
+  const { user } = useAuth();
+  const activePlan = user ? user.plan : PlanType.SNIFF;
+  const entitlements = PLAN_ENTITLEMENTS[activePlan];
+
   const [activeReplyTone, setActiveReplyTone] = useState<"Professional" | "Direct" | "Supportive">("Professional");
   const [editedReplyText, setEditedReplyText] = useState("");
   const [copiedKey, setCopiedKey] = useState<string | null>(null);
@@ -91,6 +99,10 @@ export function ResultsDashboard({
   };
 
   const handleExportPDF = () => {
+    if (!entitlements.exportSummary) {
+      toast.error("Exporting PDF report is a premium feature. Please upgrade your plan in settings!");
+      return;
+    }
     const doc = new jsPDF({
       orientation: "portrait",
       unit: "mm",
@@ -602,7 +614,26 @@ export function ResultsDashboard({
 
         {/* RIGHT COLUMN: Suggested reply & Boundary Tips */}
         <div className="lg:col-span-5 space-y-6">
-          <div className={`p-6 sm:p-7 rounded-2xl ${bgCardClass} space-y-4`} id="card_suggested_reply">
+          <div className={`p-6 sm:p-7 rounded-2xl ${bgCardClass} space-y-4 relative overflow-hidden`} id="card_suggested_reply">
+            {!entitlements.advancedReplies && (
+              <div className="absolute inset-0 z-10 flex flex-col items-center justify-center p-6 text-center bg-slate-950/80 backdrop-blur-md transition-all duration-300">
+                <span className="text-3xl mb-2">🔒</span>
+                <h4 className="text-sm font-sans font-extrabold text-slate-100 tracking-wide uppercase">
+                  Suggested Replies Locked
+                </h4>
+                <p className="text-[11px] text-slate-400 max-w-xs mt-1.5 leading-relaxed">
+                  Unlock professional, bold, and supportive response suggestions to protect your boundaries.
+                </p>
+                <button
+                  onClick={() => {
+                    toast("Please navigate to Settings & Preferences to upgrade your plan!");
+                  }}
+                  className="mt-4 px-4 py-2 bg-orange-500 hover:bg-orange-650 text-slate-950 font-mono text-[10px] font-bold uppercase rounded-lg border-none cursor-pointer"
+                >
+                  Upgrade Now
+                </button>
+              </div>
+            )}
             <div className="flex items-center justify-between border-b border-slate-150 dark:border-slate-800 pb-3 font-sans">
               <div className="flex items-center gap-2">
                 <ShieldCheck className="w-4 h-4 text-emerald-500" />
@@ -931,8 +962,12 @@ export function ResultsDashboard({
                 : "border-slate-200 text-slate-600 hover:text-slate-950 hover:bg-slate-50"
             }`}
           >
-            <FileText className="w-3.5 h-3.5 text-orange-500" />
-            <span>Export PDF</span>
+            {entitlements.exportSummary ? (
+              <FileText className="w-3.5 h-3.5 text-orange-500" />
+            ) : (
+              <span className="w-3.5 h-3.5 flex items-center justify-center text-slate-400">🔒</span>
+            )}
+            <span>Export PDF {!entitlements.exportSummary && "(Premium)"}</span>
           </button>
 
           <button

@@ -111,3 +111,42 @@ $$ LANGUAGE plpgsql SECURITY DEFINER;
 CREATE OR REPLACE TRIGGER on_auth_user_created
     AFTER INSERT ON auth.users
     FOR EACH ROW EXECUTE FUNCTION public.handle_new_user();
+
+-- 6. PLAN STATUS COLUMN ON PROFILES
+ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS plan_status TEXT NOT NULL DEFAULT 'ACTIVE' 
+    CHECK (plan_status IN ('ACTIVE', 'PENDING', 'FAILED', 'CANCELLED', 'PAST_DUE', 'EXPIRED'));
+
+-- 7. PAYMENTS AUDIT & ANALYTICS TABLE
+CREATE TABLE IF NOT EXISTS public.payments (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    user_id UUID NOT NULL REFERENCES public.profiles(id) ON DELETE CASCADE,
+    subscription_id TEXT NOT NULL,
+    payment_id TEXT UNIQUE, -- Nullable initially (when pending), becomes unique once verified
+    order_id TEXT,
+    amount INTEGER NOT NULL, -- In cents
+    currency TEXT NOT NULL,
+    status TEXT NOT NULL CHECK (status IN ('PENDING', 'ACTIVE', 'FAILED', 'CANCELLED', 'PAST_DUE', 'EXPIRED')),
+    verified BOOLEAN NOT NULL DEFAULT FALSE,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL,
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL
+);
+
+-- Index for payment checks
+CREATE INDEX IF NOT EXISTS idx_payments_subscription_id ON public.payments(subscription_id);
+CREATE INDEX IF NOT EXISTS idx_payments_user_id ON public.payments(user_id);
+
+-- 8. AUDIT & LOGGING TABLE
+CREATE TABLE IF NOT EXISTS public.payment_logs (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    user_id UUID REFERENCES public.profiles(id) ON DELETE SET NULL,
+    event_type TEXT NOT NULL,
+    payload JSONB NOT NULL,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL
+);
+
+-- 9. PERFORMANCE INDEXES
+CREATE INDEX IF NOT EXISTS idx_analysis_history_user_created ON public.analysis_history(user_id, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_payments_sub_status_created ON public.payments(subscription_id, status, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_usage_user_reset ON public.usage(user_id, last_reset);
+
+

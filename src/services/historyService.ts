@@ -1,18 +1,17 @@
 import { AnalysisResult } from "../types/analysis";
 import { getStorageStrategy } from "./storageStrategy";
-import { isLoggedIn } from "../plans/plans";
 import { localHistoryService } from "./localHistoryService";
 import { supabaseHistoryService } from "./supabaseHistoryService";
 
 // Save history using the runtime strategy (Local Storage vs Supabase Cloud)
 export async function saveHistory(history: AnalysisResult[]): Promise<void> {
-  const strategy = getStorageStrategy(isLoggedIn());
+  const strategy = await getStorageStrategy();
   return strategy.saveHistory(history);
 }
 
 // Load history using the runtime strategy (Local Storage vs Supabase Cloud)
 export async function loadHistory(): Promise<AnalysisResult[]> {
-  const strategy = getStorageStrategy(isLoggedIn());
+  const strategy = await getStorageStrategy();
   return strategy.loadHistory();
 }
 

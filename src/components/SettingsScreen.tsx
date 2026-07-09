@@ -14,6 +14,9 @@ import {
   AlertCircle
 } from "lucide-react";
 import { PlanType, UserProfile } from "../plans/plans";
+import { PLAN_ENTITLEMENTS } from "../plans/entitlements";
+import { useAuth } from "../context/AuthContext";
+import toast from "react-hot-toast";
 
 interface SettingsScreenProps {
   theme: "light" | "dark";
@@ -52,6 +55,95 @@ export function SettingsScreen({
   usageLimit,
   showImportPrompt
 }: SettingsScreenProps) {
+  const { token } = useAuth();
+  const activePlan = user ? user.plan : PlanType.SNIFF;
+  const entitlements = PLAN_ENTITLEMENTS[activePlan];
+
+  const handleUpgrade = async (targetPlan: PlanType, billingCycle: "monthly" | "yearly") => {
+    if (!user) {
+      toast.error("Please login to upgrade your plan.");
+      return;
+    }
+    
+    setIsSimulatingPayment(true);
+    try {
+      const response = await fetch("/api/payments/create-subscription", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          planType: targetPlan,
+          interval: billingCycle
+        })
+      });
+
+      if (!response.ok) {
+        throw new Error("Failed to initialize subscription checkout.");
+      }
+
+      const orderData = await response.json();
+      
+      const options = {
+        key: orderData.keyId,
+        subscription_id: orderData.subscriptionId,
+        name: "Dogesh Signal",
+        description: `${targetPlan.toUpperCase()} Plan Subscription`,
+        image: "https://ai.google.dev/static/site-assets/images/share-ais-513315318.png",
+        handler: async function (checkoutResponse: any) {
+          setIsSimulatingPayment(true);
+          try {
+            const verifyRes = await fetch("/api/payments/verify-payment", {
+              method: "POST",
+              headers: {
+                "Content-Type": "application/json",
+                "Authorization": `Bearer ${token}`
+              },
+              body: JSON.stringify({
+                razorpay_payment_id: checkoutResponse.razorpay_payment_id,
+                razorpay_subscription_id: checkoutResponse.razorpay_subscription_id,
+                razorpay_signature: checkoutResponse.razorpay_signature,
+                planType: targetPlan
+              })
+            });
+
+            const verifyData = await verifyRes.json();
+            if (verifyRes.ok && verifyData.success) {
+              toast.success(`${targetPlan.toUpperCase()} subscription activated successfully!`);
+              onUpgradePlan(targetPlan);
+            } else {
+              toast.error(verifyData.error || "Payment verification failed.");
+            }
+          } catch (err) {
+            console.error("Verification failed:", err);
+            toast.error("An error occurred during verification.");
+          } finally {
+            setIsSimulatingPayment(false);
+          }
+        },
+        prefill: {
+          email: user.email
+        },
+        theme: {
+          color: "#F97316"
+        },
+        modal: {
+          ondismiss: function () {
+            setIsSimulatingPayment(false);
+          }
+        }
+      };
+
+      const rzp = new (window as any).Razorpay(options);
+      rzp.open();
+    } catch (err: any) {
+      console.error("Upgrade checkout failed:", err);
+      toast.error(err?.message || "Failed to initialize payment checkout.");
+      setIsSimulatingPayment(false);
+    }
+  };
+
   const bgCardClass = theme === "dark"
     ? "bg-slate-900/60 border border-slate-800/80 backdrop-blur-md shadow-2xl"
     : "bg-white border border-slate-200 shadow-md";
@@ -63,6 +155,7 @@ export function SettingsScreen({
   const [allowCriticalAdvisories, setAllowCriticalAdvisories] = useState(true);
   const [allowWeeklyDigest, setAllowWeeklyDigest] = useState(false);
   const [isSimulatingPayment, setIsSimulatingPayment] = useState(false);
+  const [billingCycle, setBillingCycle] = useState<"monthly" | "yearly">("monthly");
   const [loginEmail, setLoginEmail] = useState("");
 
   return (
@@ -203,9 +296,30 @@ export function SettingsScreen({
               {/* Upgrade Subscription Section (simulating Razorpay) */}
               {user.plan !== PlanType.SHIELD && (
                 <div className="pt-2 border-t border-slate-100 dark:border-slate-900/60 space-y-2.5">
-                  <span className="text-[10px] font-mono font-bold text-slate-400 uppercase tracking-widest block">
-                    Upgrade Subscription
-                  </span>
+                  <div className="flex justify-between items-center pb-1">
+                    <span className="text-[10px] font-mono font-bold text-slate-400 uppercase tracking-widest block">
+                      Upgrade Subscription
+                    </span>
+                    <div className="p-0.5 bg-slate-200 dark:bg-slate-950 rounded-lg border border-slate-300 dark:border-slate-850 flex select-none">
+                      {(["monthly", "yearly"] as const).map((cycle) => {
+                        const isActive = billingCycle === cycle;
+                        return (
+                          <button
+                            key={cycle}
+                            type="button"
+                            onClick={() => setBillingCycle(cycle)}
+                            className={`px-2 py-0.5 rounded-md transition-all text-[8px] font-mono uppercase font-bold cursor-pointer border-none ${
+                              isActive
+                                ? "bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 shadow-sm"
+                                : "text-slate-400 hover:text-slate-900 dark:hover:text-slate-205 bg-transparent"
+                            }`}
+                          >
+                            {cycle}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
                   
                   {isSimulatingPayment ? (
                     <div className="p-3 bg-slate-950 rounded-xl border border-slate-850 flex flex-col items-center justify-center space-y-2 text-center">
@@ -215,34 +329,22 @@ export function SettingsScreen({
                       </span>
                     </div>
                   ) : (
-                    <div className="flex flex-col sm:flex-row gap-2">
+                     <div className="flex flex-col sm:flex-row gap-2">
                       {user.plan === PlanType.SNIFF && (
                         <button
-                          onClick={() => {
-                            setIsSimulatingPayment(true);
-                            setTimeout(() => {
-                              setIsSimulatingPayment(false);
-                              onUpgradePlan(PlanType.GUARD);
-                            }, 1500);
-                          }}
+                          onClick={() => handleUpgrade(PlanType.GUARD, billingCycle)}
                           className="flex-grow py-2 px-3 bg-slate-100 hover:bg-slate-200 dark:bg-slate-950 dark:hover:bg-slate-900 border border-slate-200 dark:border-slate-850 rounded-xl text-[10px] font-mono font-bold uppercase text-slate-700 dark:text-slate-200 flex items-center justify-center gap-1 cursor-pointer"
                         >
                           <CreditCard className="w-3.5 h-3.5 text-orange-500" />
-                          <span>Guard (USD 9.99/mo)</span>
+                          <span>Guard ({billingCycle === "monthly" ? "USD 9.99/mo" : "USD 99.99/yr"})</span>
                         </button>
                       )}
                       <button
-                        onClick={() => {
-                          setIsSimulatingPayment(true);
-                          setTimeout(() => {
-                            setIsSimulatingPayment(false);
-                            onUpgradePlan(PlanType.SHIELD);
-                          }, 1500);
-                        }}
+                        onClick={() => handleUpgrade(PlanType.SHIELD, billingCycle)}
                         className="flex-grow py-2 px-3 bg-orange-500 hover:bg-orange-450 text-slate-950 rounded-xl text-[10px] font-mono font-black uppercase tracking-wider flex items-center justify-center gap-1 cursor-pointer border-none"
                       >
                         <CreditCard className="w-3.5 h-3.5 text-slate-950" />
-                        <span>Shield (USD 29.99/mo)</span>
+                        <span>Shield ({billingCycle === "monthly" ? "USD 29.99/mo" : "USD 299.99/yr"})</span>
                       </button>
                     </div>
                   )}
@@ -251,10 +353,16 @@ export function SettingsScreen({
 
               {/* Log out option */}
               <div className="pt-2.5 border-t border-slate-100 dark:border-slate-900/60 flex justify-between items-center">
-                <span className="text-[9.5px] font-mono text-emerald-500 uppercase tracking-wider font-extrabold flex items-center gap-1.5 select-none">
-                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-                  Cloud active
-                </span>
+                {entitlements.cloudHistory ? (
+                  <span className="text-[9.5px] font-mono text-emerald-500 uppercase tracking-wider font-extrabold flex items-center gap-1.5 select-none">
+                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                    Cloud active
+                  </span>
+                ) : (
+                  <span className="text-[9.5px] font-mono text-amber-500 uppercase tracking-wider font-extrabold flex items-center gap-1.5 select-none" title="Cloud Sync Disabled on Sniff tier">
+                    🔒 Local active
+                  </span>
+                )}
                 <button
                   onClick={onLogout}
                   className="px-3 py-1.5 bg-rose-500/10 hover:bg-rose-500/15 text-rose-500 rounded-lg font-mono text-[9.5px] uppercase font-bold border border-rose-500/10 cursor-pointer flex items-center gap-1"
@@ -407,17 +515,26 @@ export function SettingsScreen({
             {/* Toggle 3 */}
             <div className="flex justify-between items-center py-2.5 border-t border-slate-105 dark:border-slate-900/60">
               <div>
-                <h4 className="text-xs font-bold text-slate-800 dark:text-slate-200">Weekly tips</h4>
+                <h4 className="text-xs font-bold text-slate-800 dark:text-slate-200 flex items-center gap-1">
+                  <span>Weekly tips</span>
+                  {!entitlements.patternTracking && <span className="text-[9px] text-slate-450 uppercase font-mono font-bold select-none flex items-center gap-0.5">🔒 (Shield Only)</span>}
+                </h4>
                 <p className="text-[10px] text-slate-400 mt-0.5">Get a brief weekly list of common pressure patterns.</p>
               </div>
               <button
-                onClick={() => setAllowWeeklyDigest(!allowWeeklyDigest)}
+                onClick={() => {
+                  if (!entitlements.patternTracking) {
+                    toast.error("Weekly pattern tracking is only available on the SHIELD plan.");
+                    return;
+                  }
+                  setAllowWeeklyDigest(!allowWeeklyDigest);
+                }}
                 className={`w-11 h-6 rounded-full transition-colors relative cursor-pointer border-none ${
-                  allowWeeklyDigest ? "bg-orange-500" : "bg-slate-200 dark:bg-slate-800"
-                }`}
+                  allowWeeklyDigest && entitlements.patternTracking ? "bg-orange-500" : "bg-slate-200 dark:bg-slate-800"
+                } ${!entitlements.patternTracking ? "opacity-50 cursor-not-allowed" : ""}`}
               >
                 <span className={`w-4 h-4 rounded-full bg-white absolute top-1 transition-all ${
-                  allowWeeklyDigest ? "right-1" : "left-1"
+                  allowWeeklyDigest && entitlements.patternTracking ? "right-1" : "left-1"
                 }`} />
               </button>
             </div>
