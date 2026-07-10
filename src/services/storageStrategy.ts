@@ -2,8 +2,7 @@ import { AnalysisResult } from "../types/analysis";
 import { localHistoryService } from "./localHistoryService";
 import { supabaseHistoryService } from "./supabaseHistoryService";
 import { supabase, isSupabaseConfigured } from "./supabaseClient";
-import { PlanType, getMockUser } from "../plans/plans";
-import { PLAN_ENTITLEMENTS } from "../plans/entitlements";
+import { PlanType, getMockUser, PLAN_ENTITLEMENTS } from "../plans/subscription";
 
 export interface HistoryStorage {
   saveHistory(history: AnalysisResult[]): Promise<void>;

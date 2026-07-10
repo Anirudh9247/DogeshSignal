@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, useEffect } from "react";
-import { UserProfile, PlanType } from "../plans/plans";
+import { UserProfile, PlanType } from "../plans/subscription";
 import { supabase, isSupabaseConfigured } from "../services/supabaseClient";
 
 interface AuthContextType {

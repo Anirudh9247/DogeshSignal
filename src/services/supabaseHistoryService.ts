@@ -1,6 +1,6 @@
 import { AnalysisResult } from "../types/analysis";
 import { HistoryStorage } from "./storageStrategy";
-import { getMockUser } from "../plans/plans";
+import { getMockUser } from "../plans/subscription";
 import { supabase, handleSupabaseCall } from "./supabaseClient";
 
 const CLOUD_STORAGE_KEY = "dogesh_supabase_cloud_mock";

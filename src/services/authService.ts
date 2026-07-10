@@ -1,4 +1,4 @@
-import { PlanType } from "../plans/plans";
+import { PlanType } from "../plans/subscription";
 import { supabase, handleSupabaseCall } from "./supabaseClient";
 
 export interface User {

@@ -17,7 +17,7 @@ import {
   CreditCard
 } from "lucide-react";
 import { SystemNotification } from "../types";
-import { UserProfile, PlanType } from "../plans/plans";
+import { UserProfile, PlanType } from "../plans/subscription";
 
 interface NavbarProps {
   theme: "light" | "dark";

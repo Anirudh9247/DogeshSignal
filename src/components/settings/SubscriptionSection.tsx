@@ -1,7 +1,6 @@
 import React, { useState } from "react";
 import { CreditCard, LogOut } from "lucide-react";
-import { PlanType, UserProfile } from "../../plans/plans";
-import { PLAN_ENTITLEMENTS } from "../../plans/entitlements";
+import { PlanType, UserProfile, PLAN_ENTITLEMENTS } from "../../plans/subscription";
 import toast from "react-hot-toast";
 
 interface SubscriptionSectionProps {

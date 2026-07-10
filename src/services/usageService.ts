@@ -1,5 +1,4 @@
-import { PlanType } from "../plans/plans";
-import { PLAN_ENTITLEMENTS } from "../plans/entitlements";
+import { PlanType, PLAN_ENTITLEMENTS } from "../plans/subscription";
 import { supabase, handleSupabaseCall } from "./supabaseClient";
 
 interface UsageData {

@@ -24,8 +24,7 @@ import { login as loginApi, register as registerApi } from "./services/authServi
 import { useScan } from "./hooks/useScan";
 import { useHistory } from "./hooks/useHistory";
 import { importLocalHistoryToCloud } from "./services/historyService";
-import { PlanType, UserProfile, getMockUser, isLoggedIn } from "./plans/plans";
-import { PLAN_ENTITLEMENTS } from "./plans/entitlements";
+import { PlanType, UserProfile, getMockUser, isLoggedIn, PLAN_ENTITLEMENTS } from "./plans/subscription";
 import { usageService } from "./services/usageService";
 import { localHistoryService } from "./services/localHistoryService";
 

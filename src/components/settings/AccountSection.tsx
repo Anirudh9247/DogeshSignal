@@ -1,6 +1,6 @@
 import React from "react";
 import { User, AlertCircle, ShieldCheck } from "lucide-react";
-import { PlanType, UserProfile } from "../../plans/plans";
+import { PlanType, UserProfile } from "../../plans/subscription";
 
 interface AccountSectionProps {
   theme: "light" | "dark";

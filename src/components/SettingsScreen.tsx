@@ -1,6 +1,6 @@
 import React from "react";
 import { Sliders } from "lucide-react";
-import { PlanType, UserProfile } from "../plans/plans";
+import { PlanType, UserProfile } from "../plans/subscription";
 import { useAuth } from "../context/AuthContext";
 import { AccountSection } from "./settings/AccountSection";
 import { SubscriptionSection } from "./settings/SubscriptionSection";
