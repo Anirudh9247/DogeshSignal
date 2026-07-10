@@ -1,7 +1,11 @@
-import { AnalysisResult } from "../types/analysis";
-import { HistoryStorage } from "./storageStrategy";
-import { getMockUser } from "../plans/subscription";
-import { supabase, handleSupabaseCall } from "./supabaseClient";
+import { AnalysisResult } from "../../types/analysis";
+import { getMockUser } from "../../plans/subscription";
+import { supabase, handleSupabaseCall } from "../supabaseClient";
+
+export interface HistoryStorage {
+  saveHistory(history: AnalysisResult[]): Promise<void>;
+  loadHistory(): Promise<AnalysisResult[]>;
+}
 
 const CLOUD_STORAGE_KEY = "dogesh_supabase_cloud_mock";
 
@@ -11,7 +15,22 @@ const safeIsoDate = (val: string | undefined): string => {
   return isNaN(parsed) ? new Date().toISOString() : new Date(parsed).toISOString();
 };
 
-export const supabaseHistoryService: HistoryStorage = {
+export const localHistoryRepository: HistoryStorage = {
+  async saveHistory(history: AnalysisResult[]): Promise<void> {
+    localStorage.setItem("dogesh_premium_history", JSON.stringify(history));
+  },
+  
+  async loadHistory(): Promise<AnalysisResult[]> {
+    try {
+      const data = localStorage.getItem("dogesh_premium_history");
+      return data ? JSON.parse(data) : [];
+    } catch {
+      return [];
+    }
+  }
+};
+
+export const supabaseHistoryRepository: HistoryStorage = {
   async saveHistory(history: AnalysisResult[]): Promise<void> {
     const supabaseSave = async () => {
       const { data: { user } } = await supabase.auth.getUser();

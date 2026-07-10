@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { AnalysisResult } from "../types/analysis";
-import { loadHistory, saveHistory } from "../services/historyService";
+import { loadHistory, saveHistory } from "../services/history/history.service";
 
 export function useHistory() {
   const [history, setHistory] = useState<AnalysisResult[]>([]);

@@ -23,10 +23,10 @@ import { login as loginApi, register as registerApi } from "./services/authServi
 // Hooks & Services
 import { useScan } from "./hooks/useScan";
 import { useHistory } from "./hooks/useHistory";
-import { importLocalHistoryToCloud } from "./services/historyService";
+import { importLocalHistoryToCloud } from "./services/history/history.service";
+import { localHistoryRepository } from "./services/history/history.repository";
 import { PlanType, UserProfile, getMockUser, isLoggedIn, PLAN_ENTITLEMENTS } from "./plans/subscription";
 import { usageService } from "./services/usageService";
-import { localHistoryService } from "./services/localHistoryService";
 
 // Preset database templates
 const SAMPLES = [
@@ -296,7 +296,7 @@ function DashboardView() {
         // Edge Case: Guest -> Login Sync Prompt
         // If logged in and there are unsynced guest history items locally
         if (isLoggedIn()) {
-          const localLogs = await localHistoryService.loadHistory();
+          const localLogs = await localHistoryRepository.loadHistory();
           if (localLogs.length > 0) {
             const shouldImport = window.confirm(
               `You have ${localLogs.length} message analyses stored locally on this device. Would you like to import them into your cloud account?`
@@ -323,7 +323,7 @@ function DashboardView() {
       const usage = await usageService.getUsage(email);
       setUsageCount(usage.analysesToday);
 
-      const localLogs = await localHistoryService.loadHistory();
+      const localLogs = await localHistoryRepository.loadHistory();
       setLocalHistoryCount(localLogs.length);
     };
     updateMetrics();
@@ -461,7 +461,7 @@ function DashboardView() {
       await fetchHistory();
       
       // Check if there's unsynced local history
-      const localLogs = await localHistoryService.loadHistory();
+      const localLogs = await localHistoryRepository.loadHistory();
       if (localLogs.length > 0) {
         setShowImportPrompt(true);
       }
