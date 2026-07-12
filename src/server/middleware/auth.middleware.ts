@@ -4,6 +4,9 @@ import { logEvent } from "../utils/logger";
 
 export interface AuthenticatedRequest extends Request {
   user?: any;
+  usageSource?: "plan" | "credit";
+  targetPack?: any;
+  currentUsageRow?: any;
 }
 
 export async function requireAuth(req: AuthenticatedRequest, res: Response, next: NextFunction) {

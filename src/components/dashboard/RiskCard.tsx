@@ -2,6 +2,7 @@ import React, { useState, useEffect } from "react";
 import { motion } from "motion/react";
 import { TrendingUp } from "lucide-react";
 import { AnalysisResult, MicroFeatures } from "../../types/analysis";
+import { useAuth } from "../../context/AuthContext";
 
 interface RiskCardProps {
   theme: "light" | "dark";
@@ -35,6 +36,9 @@ function AnimatedScore({ score, className }: { score: number; className: string 
 }
 
 export function RiskCard({ theme, result }: RiskCardProps) {
+  const { entitlements } = useAuth();
+  const packCredits = entitlements?.usage.packCreditsRemaining ?? 0;
+
   const bgCardClass = theme === "dark"
     ? "bg-slate-900/60 border border-slate-800/80 backdrop-blur-md shadow-2xl transition-all duration-200"
     : "bg-white border border-slate-200 shadow-sm transition-all duration-200 hover:shadow-md";
@@ -94,6 +98,13 @@ export function RiskCard({ theme, result }: RiskCardProps) {
                 {result.heuristicRiskRating > 70 ? "High risk" : result.heuristicRiskRating > 45 ? "Moderate risk" : "Low risk"}
               </span>
             </div>
+
+            {packCredits > 0 && (
+              <div className="mt-2 text-[11px] font-sans font-medium text-orange-500 bg-orange-500/10 px-3 py-1 rounded-lg border border-orange-500/20 inline-flex items-center gap-1.5 self-center lg:self-start">
+                <span className="w-1.5 h-1.5 rounded-full bg-orange-500 animate-pulse" />
+                {packCredits} prepaid credits remaining
+              </div>
+            )}
           </div>
 
           <div className="lg:col-span-8 grid grid-cols-2 sm:grid-cols-4 gap-6 pl-0 lg:pl-3">

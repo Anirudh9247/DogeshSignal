@@ -1,5 +1,9 @@
-import { Request, Response } from "express";
+import { Response } from "express";
 import { GoogleGenAI, Type } from "@google/genai";
+import { AuthenticatedRequest } from "../middleware/auth.middleware";
+import { supabaseAdmin, isSupabaseConfiguredBackend } from "../utils/supabase";
+import { PLAN_ENTITLEMENTS, PlanType } from "../../plans/subscription";
+import { logEvent } from "../utils/logger";
 
 let aiClient: GoogleGenAI | null = null;
 function getAiClient(): GoogleGenAI {
@@ -20,11 +24,97 @@ function getAiClient(): GoogleGenAI {
   return aiClient;
 }
 
-export async function analyzeMessage(req: Request, res: Response) {
+export async function analyzeMessage(req: AuthenticatedRequest, res: Response) {
   try {
     const { message, enableReplyForge } = req.body;
     if (!message || typeof message !== "string" || message.trim() === "") {
       return res.status(400).json({ error: "Message is required and must be a string." });
+    }
+
+    let plan = "sniff";
+    let usageSource: "plan" | "credit" = "plan";
+    let targetPack: any = null;
+    let currentUsageRow: any = null;
+
+    if (isSupabaseConfiguredBackend()) {
+      const { data: profile } = await supabaseAdmin
+        .from("profiles")
+        .select("plan")
+        .eq("id", req.user.id)
+        .single();
+      
+      if (profile) {
+        plan = profile.plan || "sniff";
+      }
+
+      const entitlements = PLAN_ENTITLEMENTS[plan as PlanType] || PLAN_ENTITLEMENTS[PlanType.SNIFF];
+      const limit = entitlements.limits["analysis.daily"];
+
+      if (limit !== Infinity) {
+        let analysesToday = 0;
+        const today = new Date().toISOString().split("T")[0];
+        const { data: usage } = await supabaseAdmin
+          .from("usage")
+          .select("analyses_today, last_reset")
+          .eq("user_id", req.user.id)
+          .single();
+
+        currentUsageRow = usage;
+
+        if (usage) {
+          const dbResetDate = new Date(usage.last_reset).toISOString().split("T")[0];
+          if (dbResetDate === today) {
+            analysesToday = usage.analyses_today;
+          }
+        }
+
+        if (analysesToday >= limit) {
+          // Check credit packs
+          const { data: packs, error: fetchErr } = await supabaseAdmin
+            .from("credit_packs")
+            .select("*")
+            .eq("user_id", req.user.id)
+            .gt("remaining_credits", 0);
+
+          if (fetchErr) throw fetchErr;
+
+          const now = new Date();
+          let totalValidCredits = 0;
+          const validPacks = [];
+
+          for (const pack of (packs || [])) {
+            if (pack.expires_at && new Date(pack.expires_at) <= now) {
+              await supabaseAdmin
+                .from("credit_packs")
+                .update({ remaining_credits: 0 })
+                .eq("id", pack.id);
+
+              await supabaseAdmin.from("credit_transactions").insert({
+                user_id: req.user.id,
+                amount: -pack.remaining_credits,
+                type: "EXPIRY",
+                metadata: { description: "Credit pack expired", packId: pack.id }
+              });
+            } else {
+              totalValidCredits += pack.remaining_credits;
+              validPacks.push(pack);
+            }
+          }
+
+          if (totalValidCredits <= 0) {
+            return res.status(403).json({
+              error: "Daily limit exceeded. Please upgrade your plan or purchase Signal Packs."
+            });
+          }
+
+          usageSource = "credit";
+          targetPack = validPacks.sort((a, b) => {
+            if (!a.expires_at) return 1;
+            if (!b.expires_at) return -1;
+            return new Date(a.expires_at).getTime() - new Date(b.expires_at).getTime();
+          })[0];
+        }
+      }
     }
 
     const ai = getAiClient();
@@ -335,6 +425,33 @@ ${message}
     }
 
     const result = JSON.parse(response.text.trim());
+
+    if (isSupabaseConfiguredBackend()) {
+      try {
+        if (usageSource === "credit" && targetPack) {
+          await supabaseAdmin
+            .from("credit_packs")
+            .update({ remaining_credits: targetPack.remaining_credits - 1 })
+            .eq("id", targetPack.id);
+
+          await supabaseAdmin.from("credit_transactions").insert({
+            user_id: req.user.id,
+            amount: -1,
+            type: "USAGE",
+            metadata: { description: "Daily limit exceeded scan consumption", packId: targetPack.id }
+          });
+        } else {
+          const currentCount = currentUsageRow ? currentUsageRow.analyses_today : 0;
+          await supabaseAdmin
+            .from("usage")
+            .update({ analyses_today: currentCount + 1 })
+            .eq("user_id", req.user.id);
+        }
+      } catch (dbErr: any) {
+        logEvent("WARN", "Server-side usage increment failed", { userId: req.user.id, error: dbErr.message });
+      }
+    }
+
     return res.json(result);
 
   } catch (error: any) {

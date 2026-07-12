@@ -190,7 +190,7 @@ const DEFAULT_HISTORY_ITEMS: AnalysisResult[] = [
 
 function DashboardView() {
   const navigate = useNavigate();
-  const { user, logout, updateUserPlan, login: authLogin } = useAuth();
+  const { user, logout, updateUserPlan, login: authLogin, entitlements, refreshEntitlements } = useAuth();
   const [theme, setTheme] = useState<"light" | "dark" | "system">("dark");
   const [activeTab, setActiveTab] = useState<string>("landing");
   const [textSize, setTextSize] = useState<"sm" | "md" | "lg">("md");
@@ -320,14 +320,18 @@ function DashboardView() {
   useEffect(() => {
     const updateMetrics = async () => {
       const email = user ? user.email : null;
-      const usage = await usageService.getUsage(email);
-      setUsageCount(usage.analysesToday);
+      if (entitlements) {
+        setUsageCount(entitlements.usage.analysesToday);
+      } else {
+        const usage = await usageService.getUsage(email);
+        setUsageCount(usage.analysesToday);
+      }
 
       const localLogs = await localHistoryRepository.loadHistory();
       setLocalHistoryCount(localLogs.length);
     };
     updateMetrics();
-  }, [user, history]);
+  }, [user, history, entitlements]);
 
   // Sync theme class to document element for Tailwind dark variants
   useEffect(() => {
@@ -409,7 +413,8 @@ function DashboardView() {
       const refreshedHistory = [data, ...history.filter(h => h.messageText !== finalText)];
       await updateHistory(refreshedHistory);
 
-      await usageService.incrementUsage(email);
+      await usageService.incrementUsage(email, activePlan);
+      await refreshEntitlements();
 
       const hasHighPressure = data.heuristicRiskRating > 50;
       const notif: SystemNotification = {
@@ -528,7 +533,8 @@ function DashboardView() {
 
   const handleUpgradePlan = async (plan: PlanType) => {
     if (!user) return;
-    updateUserPlan(plan);
+    await updateUserPlan(plan);
+    await refreshEntitlements();
     
     const upgradeNotif: SystemNotification = {
       id: "notif-upgrade-" + Date.now(),
@@ -613,7 +619,7 @@ function DashboardView() {
         onLogout={handleLogout}
         onUpgradePlan={handleUpgradePlan}
         usageCount={usageCount}
-        usageLimit={user ? PLAN_ENTITLEMENTS[user.plan].analysesPerDay : PLAN_ENTITLEMENTS[PlanType.SNIFF].analysesPerDay}
+        usageLimit={entitlements?.limits["analysis.daily"] ?? PLAN_ENTITLEMENTS[PlanType.SNIFF].limits["analysis.daily"]}
       />
 
       {/* ACTIVE PAGE CONTENT HUB */}
@@ -742,7 +748,7 @@ function DashboardView() {
                 onImportHistory={handleImportHistory}
                 onSkipImport={handleSkipImport}
                 usageCount={usageCount}
-                usageLimit={user ? PLAN_ENTITLEMENTS[user.plan].analysesPerDay : PLAN_ENTITLEMENTS[PlanType.SNIFF].analysesPerDay}
+                usageLimit={entitlements?.limits["analysis.daily"] ?? PLAN_ENTITLEMENTS[PlanType.SNIFF].limits["analysis.daily"]}
                 showImportPrompt={showImportPrompt}
               />
             </motion.div>

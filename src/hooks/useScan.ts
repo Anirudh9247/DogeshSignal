@@ -1,7 +1,9 @@
 import { useState } from "react";
 import { AnalysisResult } from "../types/analysis";
+import { useAuth } from "../context/AuthContext";
 
 export function useScan() {
+  const { token } = useAuth();
   const [messageText, setMessageText] = useState("");
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [result, setResult] = useState<AnalysisResult | null>(null);
@@ -39,7 +41,10 @@ export function useScan() {
     try {
       const response = await fetch("/api/analyze", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { 
+          "Content-Type": "application/json",
+          ...(token ? { "Authorization": `Bearer ${token}` } : {})
+        },
         body: JSON.stringify({ message: finalText, enableReplyForge: true }),
       });
 

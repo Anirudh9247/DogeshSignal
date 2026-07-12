@@ -24,11 +24,13 @@ import analysisRouter from "./src/server/routes/analysis.routes";
 import paymentRouter from "./src/server/routes/payment.routes";
 import webhookRouter from "./src/server/routes/webhook.routes";
 import healthRouter from "./src/server/routes/health.routes";
+import entitlementsRouter from "./src/server/routes/entitlements.routes";
 
 app.use("/api", analysisRouter);
 app.use("/api", paymentRouter);
 app.use("/api", webhookRouter);
 app.use("/api", healthRouter);
+app.use("/api", entitlementsRouter);
 
 // App server startup
 async function startServer() {

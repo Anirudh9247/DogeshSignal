@@ -7,7 +7,7 @@
 CREATE TABLE IF NOT EXISTS public.profiles (
     id UUID PRIMARY KEY REFERENCES auth.users(id) ON DELETE CASCADE,
     email TEXT NOT NULL UNIQUE,
-    plan TEXT NOT NULL DEFAULT 'sniff' CHECK (plan IN ('sniff', 'guard', 'shield')),
+    plan TEXT NOT NULL DEFAULT 'sniff' CHECK (plan IN ('sniff', 'guard_monthly', 'guard_annual', 'shield_monthly', 'shield_annual')),
     created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL
 );
 
@@ -68,9 +68,8 @@ CREATE POLICY "Users can read own usage"
     ON public.usage FOR SELECT
     USING (auth.uid() = user_id);
 
-CREATE POLICY "System/Users can update own usage count"
-    ON public.usage FOR UPDATE
-    USING (auth.uid() = user_id);
+-- Direct client updates to usage are disabled for security; increments are processed securely on the backend server.
+
 
 -- Index for User lookup in usage
 CREATE INDEX IF NOT EXISTS idx_usage_user_id ON public.usage(user_id);
@@ -92,6 +91,26 @@ CREATE POLICY "Users can read own credit packs"
     USING (auth.uid() = user_id);
 
 CREATE INDEX IF NOT EXISTS idx_credit_packs_user_id ON public.credit_packs(user_id);
+
+-- 4b. CREDIT TRANSACTIONS TABLE
+-- Audits usage and addition of prepaid credits
+CREATE TABLE IF NOT EXISTS public.credit_transactions (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    user_id UUID NOT NULL REFERENCES public.profiles(id) ON DELETE CASCADE,
+    amount INTEGER NOT NULL,
+    type TEXT NOT NULL CHECK (type IN ('PURCHASE', 'USAGE', 'EXPIRY', 'REFUND')),
+    metadata JSONB NOT NULL DEFAULT '{}'::jsonb,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL
+);
+
+-- Enable RLS
+ALTER TABLE public.credit_transactions ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "Users can view own transactions"
+    ON public.credit_transactions FOR SELECT
+    USING (auth.uid() = user_id);
+
+CREATE INDEX IF NOT EXISTS idx_credit_transactions_user_id ON public.credit_transactions(user_id);
 
 -- 5. PROFILE TRIGGER ON SIGNUP
 -- Automatically populate profiles on Auth Sign Up

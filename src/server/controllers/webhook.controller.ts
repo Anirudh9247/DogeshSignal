@@ -38,7 +38,24 @@ export async function processWebhook(req: Request, res: Response) {
     // Extract notes metadata
     const notes = subscription?.notes || {};
     const userId = notes.userId;
-    const planType = notes.planType || "guard";
+    
+    // Resolve precise plan code
+    const planId = subscription?.plan_id;
+    let planType = "sniff";
+    if (planId === "plan_guard_monthly_live_128938129") planType = "guard_monthly";
+    else if (planId === "plan_guard_yearly_live_128938130") planType = "guard_annual";
+    else if (planId === "plan_shield_monthly_live_128938131") planType = "shield_monthly";
+    else if (planId === "plan_shield_yearly_live_128938132") planType = "shield_annual";
+    else {
+      if (amount === 12900) planType = "shield_annual";
+      else if (amount === 1299) planType = "shield_monthly";
+      else if (amount === 4900) planType = "guard_annual";
+      else if (amount === 499) planType = "guard_monthly";
+      else {
+        const notesPlan = notes.planType || "guard";
+        planType = notesPlan === "shield" ? "shield_monthly" : "guard_monthly";
+      }
+    }
 
     // Webhook Replay Protection using Event ID
     const webhookEventId = body.id || (body.created_at ? `evt_${body.created_at}` : `evt_unknown_${Date.now()}`);

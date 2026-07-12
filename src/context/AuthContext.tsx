@@ -1,13 +1,34 @@
 import React, { createContext, useContext, useState, useEffect } from "react";
-import { UserProfile, PlanType } from "../plans/subscription";
+import { UserProfile, PlanType, Entitlements, PLAN_ENTITLEMENTS, FeatureKey } from "../plans/subscription";
 import { supabase, isSupabaseConfigured } from "../services/supabaseClient";
+
+export interface EntitlementPayload {
+  userId: string;
+  email: string;
+  plan: PlanType;
+  status: string;
+  features: Record<FeatureKey, boolean>;
+  limits: {
+    "analysis.daily": number;
+    "analysis.monthly": number;
+    "cloud_history.saved": number;
+    "exports.monthly": number;
+    "premium_scenarios.monthly": number;
+  };
+  usage: {
+    analysesToday: number;
+    packCreditsRemaining: number;
+  };
+}
 
 interface AuthContextType {
   token: string | null;
   user: UserProfile | null;
+  entitlements: EntitlementPayload | null;
   login: (token: string, user: UserProfile) => void;
   logout: () => void;
   updateUserPlan: (plan: PlanType) => void;
+  refreshEntitlements: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -15,9 +36,51 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [token, setToken] = useState<string | null>(null);
   const [user, setUser] = useState<UserProfile | null>(null);
+  const [entitlements, setEntitlements] = useState<EntitlementPayload | null>(null);
   const [isInitializing, setIsInitializing] = useState(true);
 
-  const fetchUserProfile = async (userId: string) => {
+  const getMockEntitlements = (usr: UserProfile | null): EntitlementPayload | null => {
+    if (!usr) return null;
+    const planEnts = PLAN_ENTITLEMENTS[usr.plan];
+    return {
+      userId: usr.id,
+      email: usr.email,
+      plan: usr.plan,
+      status: "ACTIVE",
+      features: planEnts.features,
+      limits: planEnts.limits,
+      usage: {
+        analysesToday: 0,
+        packCreditsRemaining: 0
+      }
+    };
+  };
+
+  const fetchEntitlements = async (authToken: string | null, currentUser: UserProfile | null) => {
+    if (!isSupabaseConfigured() || !authToken) {
+      setEntitlements(getMockEntitlements(currentUser));
+      return;
+    }
+
+    try {
+      const response = await fetch("/api/entitlements", {
+        headers: {
+          "Authorization": `Bearer ${authToken}`
+        }
+      });
+      if (response.ok) {
+        const data = await response.json();
+        setEntitlements(data);
+      } else {
+        setEntitlements(getMockEntitlements(currentUser));
+      }
+    } catch (err) {
+      console.error("Error fetching entitlements:", err);
+      setEntitlements(getMockEntitlements(currentUser));
+    }
+  };
+
+  const fetchUserProfile = async (userId: string, authToken: string | null) => {
     try {
       const { data: profile } = await supabase
         .from("profiles")
@@ -25,16 +88,22 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         .eq("id", userId)
         .single();
       if (profile) {
-        setUser({
+        const usrProfile: UserProfile = {
           id: profile.id,
           email: profile.email,
           plan: profile.plan as PlanType,
           createdAt: profile.created_at,
-        });
+        };
+        setUser(usrProfile);
+        await fetchEntitlements(authToken, usrProfile);
       }
     } catch (err) {
       console.error("Error fetching user profile:", err);
     }
+  };
+
+  const refreshEntitlements = async () => {
+    await fetchEntitlements(token, user);
   };
 
   useEffect(() => {
@@ -43,7 +112,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       supabase.auth.getSession().then(({ data: { session } }) => {
         if (session) {
           setToken(session.access_token);
-          fetchUserProfile(session.user.id).finally(() => {
+          fetchUserProfile(session.user.id, session.access_token).finally(() => {
             setIsInitializing(false);
           });
         } else {
@@ -57,10 +126,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       } = supabase.auth.onAuthStateChange(async (event, session) => {
         if (session) {
           setToken(session.access_token);
-          await fetchUserProfile(session.user.id);
+          await fetchUserProfile(session.user.id, session.access_token);
         } else {
           setToken(null);
           setUser(null);
+          setEntitlements(null);
         }
         setIsInitializing(false);
       });
@@ -72,12 +142,26 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       const savedToken = localStorage.getItem("dogesh_auth_token");
       const savedUser = localStorage.getItem("dogesh_mock_user");
       if (savedToken && savedUser) {
+        const parsedUser = JSON.parse(savedUser);
         setToken(savedToken);
-        setUser(JSON.parse(savedUser));
+        setUser(parsedUser);
+        setEntitlements(getMockEntitlements(parsedUser));
       }
       setIsInitializing(false);
     }
   }, []);
+
+  useEffect(() => {
+    const handleFocus = () => {
+      if (token) {
+        refreshEntitlements();
+      }
+    };
+    window.addEventListener("focus", handleFocus);
+    return () => {
+      window.removeEventListener("focus", handleFocus);
+    };
+  }, [token, user]);
 
   const login = (newToken: string, newUser: UserProfile) => {
     localStorage.setItem("dogesh_auth_token", newToken);
@@ -86,6 +170,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
     setToken(newToken);
     setUser(newUser);
+    fetchEntitlements(newToken, newUser);
   };
 
   const logout = async () => {
@@ -96,16 +181,18 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     localStorage.removeItem("dogesh_mock_user");
     setToken(null);
     setUser(null);
+    setEntitlements(null);
   };
 
   const updateUserPlan = async (plan: PlanType) => {
     if (user) {
       if (isSupabaseConfigured()) {
-        await fetchUserProfile(user.id);
+        await fetchUserProfile(user.id, token);
       } else {
         const updatedUser = { ...user, plan };
         localStorage.setItem("dogesh_mock_user", JSON.stringify(updatedUser));
         setUser(updatedUser);
+        setEntitlements(getMockEntitlements(updatedUser));
       }
     }
   };
@@ -115,7 +202,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   }
 
   return (
-    <AuthContext.Provider value={{ token, user, login, logout, updateUserPlan }}>
+    <AuthContext.Provider value={{ token, user, entitlements, login, logout, updateUserPlan, refreshEntitlements }}>
       {children}
     </AuthContext.Provider>
   );

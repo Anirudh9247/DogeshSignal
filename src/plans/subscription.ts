@@ -1,7 +1,9 @@
 export enum PlanType {
   SNIFF = "sniff",
-  GUARD = "guard",
-  SHIELD = "shield"
+  GUARD_MONTHLY = "guard_monthly",
+  GUARD_ANNUAL = "guard_annual",
+  SHIELD_MONTHLY = "shield_monthly",
+  SHIELD_ANNUAL = "shield_annual"
 }
 
 export interface UserProfile {
@@ -11,33 +13,132 @@ export interface UserProfile {
   createdAt: string;
 }
 
+export type FeatureKey =
+  | "analysis.basic"
+  | "analysis.advanced"
+  | "analysis.premium"
+  | "history.local"
+  | "history.cloud"
+  | "reply.basic"
+  | "reply.smart"
+  | "reply.premium"
+  | "export.summary"
+  | "tracking.basic"
+  | "tracking.full"
+  | "scenarios.selected"
+  | "scenarios.full"
+  | "support.priority"
+  | "beta.early_access";
+
 export interface Entitlements {
-  analysesPerDay: number;
-  cloudHistory: boolean;
-  exportSummary: boolean;
-  advancedReplies: boolean;
-  patternTracking?: boolean;
+  features: Record<FeatureKey, boolean>;
+  limits: {
+    "analysis.daily": number;
+    "analysis.monthly": number;
+    "cloud_history.saved": number;
+    "exports.monthly": number;
+    "premium_scenarios.monthly": number;
+  };
 }
+
+const sniffFeatures: Record<FeatureKey, boolean> = {
+  "analysis.basic": true,
+  "analysis.advanced": false,
+  "analysis.premium": false,
+  "history.local": true,
+  "history.cloud": false,
+  "reply.basic": true,
+  "reply.smart": false,
+  "reply.premium": false,
+  "export.summary": false,
+  "tracking.basic": false,
+  "tracking.full": false,
+  "scenarios.selected": false,
+  "scenarios.full": false,
+  "support.priority": false,
+  "beta.early_access": false
+};
+
+const sniffLimits = {
+  "analysis.daily": 5,
+  "analysis.monthly": 30,
+  "cloud_history.saved": 0,
+  "exports.monthly": 0,
+  "premium_scenarios.monthly": 0
+};
+
+const guardFeatures: Record<FeatureKey, boolean> = {
+  "analysis.basic": true,
+  "analysis.advanced": true,
+  "analysis.premium": false,
+  "history.local": true,
+  "history.cloud": true,
+  "reply.basic": true,
+  "reply.smart": true,
+  "reply.premium": false,
+  "export.summary": true,
+  "tracking.basic": true,
+  "tracking.full": false,
+  "scenarios.selected": true,
+  "scenarios.full": false,
+  "support.priority": false,
+  "beta.early_access": false
+};
+
+const guardLimits = {
+  "analysis.daily": 50,
+  "analysis.monthly": 3000,
+  "cloud_history.saved": 500,
+  "exports.monthly": 50,
+  "premium_scenarios.monthly": 20
+};
+
+const shieldFeatures: Record<FeatureKey, boolean> = {
+  "analysis.basic": true,
+  "analysis.advanced": true,
+  "analysis.premium": true,
+  "history.local": true,
+  "history.cloud": true,
+  "reply.basic": true,
+  "reply.smart": true,
+  "reply.premium": true,
+  "export.summary": true,
+  "tracking.basic": true,
+  "tracking.full": true,
+  "scenarios.selected": true,
+  "scenarios.full": true,
+  "support.priority": true,
+  "beta.early_access": true
+};
+
+const shieldLimits = {
+  "analysis.daily": 200,
+  "analysis.monthly": Infinity,
+  "cloud_history.saved": Infinity,
+  "exports.monthly": Infinity,
+  "premium_scenarios.monthly": Infinity
+};
 
 export const PLAN_ENTITLEMENTS: Record<PlanType, Entitlements> = {
   [PlanType.SNIFF]: {
-    analysesPerDay: 10,
-    cloudHistory: false,
-    exportSummary: false,
-    advancedReplies: false
+    features: sniffFeatures,
+    limits: sniffLimits
   },
-  [PlanType.GUARD]: {
-    analysesPerDay: 100,
-    cloudHistory: true,
-    exportSummary: true,
-    advancedReplies: true
+  [PlanType.GUARD_MONTHLY]: {
+    features: guardFeatures,
+    limits: guardLimits
   },
-  [PlanType.SHIELD]: {
-    analysesPerDay: Infinity,
-    cloudHistory: true,
-    exportSummary: true,
-    advancedReplies: true,
-    patternTracking: true
+  [PlanType.GUARD_ANNUAL]: {
+    features: guardFeatures,
+    limits: guardLimits
+  },
+  [PlanType.SHIELD_MONTHLY]: {
+    features: shieldFeatures,
+    limits: shieldLimits
+  },
+  [PlanType.SHIELD_ANNUAL]: {
+    features: shieldFeatures,
+    limits: shieldLimits
   }
 };
 

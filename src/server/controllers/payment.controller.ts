@@ -8,16 +8,16 @@ import crypto from "crypto";
 export const PLAN_IDS: Record<string, string | null> = {
   sniff: null,
   guard_monthly: "plan_guard_monthly_live_128938129",
-  guard_yearly: "plan_guard_yearly_live_128938130",
+  guard_annual: "plan_guard_yearly_live_128938130",
   shield_monthly: "plan_shield_monthly_live_128938131",
-  shield_yearly: "plan_shield_yearly_live_128938132"
+  shield_annual: "plan_shield_yearly_live_128938132"
 };
 
 export const PLAN_AMOUNTS: Record<string, number> = {
-  guard_monthly: 999,
-  guard_yearly: 9999,
-  shield_monthly: 2999,
-  shield_yearly: 29999
+  guard_monthly: 499,
+  guard_annual: 4900,
+  shield_monthly: 1299,
+  shield_annual: 12900
 };
 
 export async function createSubscription(req: AuthenticatedRequest, res: Response) {
@@ -27,11 +27,17 @@ export async function createSubscription(req: AuthenticatedRequest, res: Respons
   
   try {
     const { planType, interval } = req.body;
+    if (!planType || !interval) {
+      return res.status(400).json({ error: "Missing required parameters: planType and interval." });
+    }
     if (planType !== "guard" && planType !== "shield") {
-      return res.status(400).json({ error: "Invalid plan type. Must be 'guard' or 'shield'." });
+      return res.status(400).json({ error: "Invalid planType. Must be 'guard' or 'shield'." });
+    }
+    if (interval !== "monthly" && interval !== "yearly" && interval !== "annual") {
+      return res.status(400).json({ error: "Invalid interval. Must be 'monthly', 'yearly', or 'annual'." });
     }
 
-    const billingCycle = interval === "yearly" ? "yearly" : "monthly";
+    const billingCycle = interval === "yearly" || interval === "annual" ? "annual" : "monthly";
     const planKey = `${planType}_${billingCycle}`;
     const amount = PLAN_AMOUNTS[planKey];
     const currency = "USD";
@@ -286,7 +292,40 @@ export async function restoreSubscription(req: AuthenticatedRequest, res: Respon
 
     if (payments && payments.length > 0) {
       const activeSub = payments[0];
-      const planType = (activeSub.amount === PLAN_AMOUNTS.shield_monthly || activeSub.amount === PLAN_AMOUNTS.shield_yearly) ? "shield" : "guard";
+      const subscriptionId = activeSub.subscription_id;
+      const hasRazorpayConfig = !!process.env.RAZORPAY_KEY_SECRET && process.env.RAZORPAY_KEY_SECRET !== "placeholder-secret";
+
+      let planType = "sniff";
+
+      if (hasRazorpayConfig && subscriptionId && !subscriptionId.startsWith("sub_mock_")) {
+        try {
+          const authHeader = Buffer.from(`${process.env.VITE_RAZORPAY_KEY_ID}:${process.env.RAZORPAY_KEY_SECRET}`).toString("base64");
+          const rzpResponse = await fetchWithRetry(`https://api.razorpay.com/v1/subscriptions/${subscriptionId}`, {
+            method: "GET",
+            headers: {
+              "Authorization": `Basic ${authHeader}`
+            }
+          });
+          if (rzpResponse.ok) {
+            const rzpData = await rzpResponse.json();
+            const planId = rzpData.plan_id;
+            if (planId === "plan_guard_monthly_live_128938129") planType = "guard_monthly";
+            else if (planId === "plan_guard_yearly_live_128938130") planType = "guard_annual";
+            else if (planId === "plan_shield_monthly_live_128938131") planType = "shield_monthly";
+            else if (planId === "plan_shield_yearly_live_128938132") planType = "shield_annual";
+          }
+        } catch (err) {
+          console.error("Razorpay subscription fetch failed during restore:", err);
+        }
+      }
+
+      // Fallback: Check amount if not resolved from plan_id
+      if (planType === "sniff") {
+        if (activeSub.amount === PLAN_AMOUNTS.shield_annual) planType = "shield_annual";
+        else if (activeSub.amount === PLAN_AMOUNTS.shield_monthly) planType = "shield_monthly";
+        else if (activeSub.amount === PLAN_AMOUNTS.guard_annual) planType = "guard_annual";
+        else if (activeSub.amount === PLAN_AMOUNTS.guard_monthly) planType = "guard_monthly";
+      }
       
       await supabaseAdmin
         .from("profiles")
