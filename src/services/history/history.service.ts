@@ -32,7 +32,7 @@ export async function getStorageStrategy(): Promise<HistoryStorage> {
 
   if (isUserLoggedIn) {
     const plan = await getActiveUserPlan();
-    if (PLAN_ENTITLEMENTS[plan].cloudHistory) {
+    if (PLAN_ENTITLEMENTS[plan].features["history.cloud"]) {
       return supabaseHistoryRepository;
     }
   }

@@ -16,7 +16,18 @@ export async function processWebhook(req: Request, res: Response) {
         .update(rawBodyString)
         .digest("hex");
 
-      if (expectedSignature !== signature) {
+      const expectedBuffer = Buffer.from(expectedSignature, "hex");
+      const receivedBuffer = Buffer.from(
+        signature && expectedSignature.length === signature.length 
+          ? signature 
+          : expectedSignature, 
+        "hex"
+      );
+
+      const signaturesMatch = crypto.timingSafeEqual(expectedBuffer, receivedBuffer);
+      const isValid = (signature && expectedSignature.length === signature.length) && signaturesMatch;
+
+      if (!isValid) {
         logEvent("ERROR", "Webhook signature verification failed");
         return res.status(400).json({ error: "Invalid webhook signature" });
       }

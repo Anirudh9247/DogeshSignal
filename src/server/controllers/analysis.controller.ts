@@ -36,7 +36,9 @@ export async function analyzeMessage(req: AuthenticatedRequest, res: Response) {
     let targetPack: any = null;
     let currentUsageRow: any = null;
 
-    if (isSupabaseConfiguredBackend()) {
+    // ── Admin / tester bypass — skip all limit checks ─────────────────────
+    if (!req.user.isAdmin && isSupabaseConfiguredBackend()) {
+    // ──────────────────────────────────────────────────────────────────────
       const { data: profile } = await supabaseAdmin
         .from("profiles")
         .select("plan")
@@ -115,7 +117,8 @@ export async function analyzeMessage(req: AuthenticatedRequest, res: Response) {
           })[0];
         }
       }
-    }
+    } // end non-admin limit check
+
 
     const ai = getAiClient();
 
@@ -426,13 +429,21 @@ ${message}
 
     const result = JSON.parse(response.text.trim());
 
-    if (isSupabaseConfiguredBackend()) {
+    if (!req.user.isAdmin && isSupabaseConfiguredBackend()) {
       try {
         if (usageSource === "credit" && targetPack) {
-          await supabaseAdmin
-            .from("credit_packs")
-            .update({ remaining_credits: targetPack.remaining_credits - 1 })
-            .eq("id", targetPack.id);
+          // Attempt atomic credit pack decrement RPC
+          const { error: rpcErr } = await supabaseAdmin.rpc("decrement_credit_pack", { pack_id_param: targetPack.id });
+          
+          if (rpcErr && rpcErr.code === "42883") {
+            // Fallback to read-then-write if RPC function is not yet deployed
+            await supabaseAdmin
+              .from("credit_packs")
+              .update({ remaining_credits: targetPack.remaining_credits - 1 })
+              .eq("id", targetPack.id);
+          } else if (rpcErr) {
+            throw rpcErr;
+          }
 
           await supabaseAdmin.from("credit_transactions").insert({
             user_id: req.user.id,
@@ -441,16 +452,24 @@ ${message}
             metadata: { description: "Daily limit exceeded scan consumption", packId: targetPack.id }
           });
         } else {
-          const currentCount = currentUsageRow ? currentUsageRow.analyses_today : 0;
-          await supabaseAdmin
-            .from("usage")
-            .update({ analyses_today: currentCount + 1 })
-            .eq("user_id", req.user.id);
+          // Attempt atomic usage increment RPC
+          const { error: rpcErr } = await supabaseAdmin.rpc("increment_daily_usage", { user_id_param: req.user.id });
+          
+          if (rpcErr && rpcErr.code === "42883") {
+            // Fallback to read-then-write if RPC function is not yet deployed
+            const currentCount = currentUsageRow ? currentUsageRow.analyses_today : 0;
+            await supabaseAdmin
+              .from("usage")
+              .update({ analyses_today: currentCount + 1 })
+              .eq("user_id", req.user.id);
+          } else if (rpcErr) {
+            throw rpcErr;
+          }
         }
       } catch (dbErr: any) {
         logEvent("WARN", "Server-side usage increment failed", { userId: req.user.id, error: dbErr.message });
       }
-    }
+    } // end non-admin usage write
 
     return res.json(result);
 

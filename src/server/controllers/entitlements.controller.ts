@@ -9,6 +9,27 @@ export async function getUserEntitlements(req: AuthenticatedRequest, res: Respon
     const userId = req.user.id;
     const userEmail = req.user.email;
 
+    // ── Admin / tester bypass ──────────────────────────────────────────────
+    // Admin accounts get shield_annual entitlements with no usage counted.
+    // No payment, no DB plan lookup required.
+    if (req.user.isAdmin) {
+      const entitlementData = PLAN_ENTITLEMENTS[PlanType.SHIELD_ANNUAL];
+      return res.json({
+        userId,
+        email: userEmail,
+        plan: PlanType.SHIELD_ANNUAL,
+        status: "ACTIVE",
+        isAdmin: true,
+        features: entitlementData.features,
+        limits: { ...entitlementData.limits, dailyAnalyses: 999999 },
+        usage: {
+          analysesToday: 0,
+          packCreditsRemaining: 999999,
+        },
+      });
+    }
+    // ──────────────────────────────────────────────────────────────────────
+
     let plan = "sniff";
     let status = "ACTIVE";
     let analysesToday = 0;

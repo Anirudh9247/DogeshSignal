@@ -8,8 +8,8 @@ const Button = ({ children, disabled, className = '', ...props }: ButtonProps) =
   return (
     <button
       disabled={disabled}
-      className={`w-full rounded-xl bg-cyan-500 px-4 py-3 font-semibold text-white transition ${
-        disabled ? 'opacity-50 cursor-not-allowed' : 'hover:bg-cyan-600'
+      className={`w-full rounded-xl bg-orange-500 px-4 py-3 font-semibold text-slate-950 transition cursor-pointer ${
+        disabled ? 'opacity-50 cursor-not-allowed' : 'hover:bg-orange-600'
       } ${className}`}
       {...props}
     >

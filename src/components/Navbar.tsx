@@ -1,5 +1,6 @@
 import React, { useState } from "react";
 import { motion, AnimatePresence } from "motion/react";
+import { useNavigate } from "react-router-dom";
 import { DogeshLogo } from "./BrandSystem";
 import { 
   Sun, 
@@ -57,6 +58,7 @@ export function Navbar({
   usageCount,
   usageLimit
 }: NavbarProps) {
+  const navigate = useNavigate();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isProfileOpen, setIsProfileOpen] = useState(false);
   const [authMode, setAuthMode] = useState<"login" | "register">("login");
@@ -100,7 +102,7 @@ export function Navbar({
       className={`sticky top-0 z-40 transition-colors duration-255 border-b ${
         theme === "dark" 
           ? "bg-slate-950/80 border-slate-900/60 text-slate-100" 
-          : "bg-white/95 border-slate-150 text-slate-900 shadow-3xs"
+          : "bg-white/95 border-slate-200 text-slate-900 shadow-3xs"
       } backdrop-blur-md`}
       id="app_header"
     >
@@ -115,8 +117,8 @@ export function Navbar({
           className="flex items-center gap-3 cursor-pointer group select-none"
           id="nav_brand"
         >
-          <div className="w-8.5 h-8.5 rounded-lg bg-orange-500 flex items-center justify-center shadow-xs group-hover:scale-[1.03] transition-all">
-            <DogeshLogo className="w-6.5 h-6.5" animate={unreadCount > 0} />
+          <div className="w-9 h-9 flex items-center justify-center group-hover:scale-[1.03] transition-all">
+            <DogeshLogo className="w-9 h-9" animate={unreadCount > 0} />
           </div>
           <div className="text-left">
             <span className={`font-sans font-extrabold tracking-tight text-sm sm:text-base leading-none block ${textTitleClass}`}>
@@ -224,7 +226,13 @@ export function Navbar({
           {/* Unified Profile/Auth button & dropdown */}
           <div className="relative" id="navbar_profile_container">
             <button
-              onClick={() => setIsProfileOpen(!isProfileOpen)}
+              onClick={() => {
+                if (user) {
+                  setIsProfileOpen(!isProfileOpen);
+                } else {
+                  navigate("/login");
+                }
+              }}
               className={`p-2 rounded-xl border transition-colors cursor-pointer flex items-center justify-center gap-1.5 ${
                 theme === "dark" 
                   ? "bg-slate-900 border-slate-800 text-slate-350 hover:bg-slate-850" 
@@ -284,27 +292,19 @@ export function Navbar({
                           />
                         </div>
                       </div>
-
-                      {/* Upgrade Plan Buttons inside Profile */}
-                      {user.plan !== PlanType.SHIELD && (
+                      {/* Upgrade Plan link inside Profile */}
+                      {user.plan !== PlanType.SHIELD_MONTHLY && user.plan !== PlanType.SHIELD_ANNUAL && (
                         <div className="space-y-2 border-t border-slate-100 dark:border-slate-800 pt-3">
-                          <span className="text-[9px] font-mono font-bold text-slate-400 uppercase tracking-wider block">Simulated billing</span>
-                          <div className="flex gap-2">
-                            {user.plan === PlanType.SNIFF && (
-                              <button
-                                onClick={() => onUpgradePlan(PlanType.GUARD)}
-                                className="flex-grow py-1.5 px-2 bg-slate-100 dark:bg-slate-950 border border-slate-200 dark:border-slate-850 hover:bg-slate-200 dark:hover:bg-slate-800 rounded-lg text-[9px] font-mono font-bold text-slate-700 dark:text-slate-350 cursor-pointer"
-                              >
-                                Upgrade Guard
-                              </button>
-                            )}
-                            <button
-                              onClick={() => onUpgradePlan(PlanType.SHIELD)}
-                              className="flex-grow py-1.5 px-2 bg-orange-500 hover:bg-orange-600 text-slate-950 rounded-lg text-[9px] font-mono font-bold cursor-pointer border-none"
-                            >
-                              Upgrade Shield
-                            </button>
-                          </div>
+                          <button
+                            onClick={() => {
+                              setActiveTab("settings");
+                              setIsProfileOpen(false);
+                            }}
+                            className="w-full py-1.5 px-2 bg-orange-500 hover:bg-orange-600 text-slate-950 hover:text-slate-900 rounded-lg text-[10px] font-mono font-bold cursor-pointer border-none text-center flex items-center justify-center gap-1.5"
+                          >
+                            <CreditCard className="w-3.5 h-3.5" />
+                            <span>Manage Plan & Billing</span>
+                          </button>
                         </div>
                       )}
 
@@ -378,13 +378,19 @@ export function Navbar({
                           <button
                             disabled={isSubmitting}
                             onClick={async () => {
-                              if (!loginEmail.trim() || !loginPassword) {
-                                setAuthError("Please fill all fields");
+                              const emailVal = loginEmail.trim().toLowerCase();
+                              const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+                              if (!emailVal || !EMAIL_RE.test(emailVal)) {
+                                setAuthError("Please enter a valid email address");
+                                return;
+                              }
+                              if (!loginPassword) {
+                                setAuthError("Please enter your password");
                                 return;
                               }
                               setIsSubmitting(true);
                               setAuthError(null);
-                              const ok = await onLogin(loginEmail.trim(), loginPassword);
+                              const ok = await onLogin(emailVal, loginPassword);
                               setIsSubmitting(false);
                               if (ok) {
                                 setIsProfileOpen(false);
@@ -418,7 +424,7 @@ export function Navbar({
                               placeholder="you@domain.com"
                               value={regEmail}
                               onChange={(e) => setRegEmail(e.target.value)}
-                              className="w-full rounded-xl border border-slate-200 dark:border-slate-855 bg-slate-50 dark:bg-slate-955 px-3 py-2 text-xs outline-none focus:border-orange-500/50 text-slate-800 dark:text-slate-100"
+                              className="w-full rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950 px-3 py-2 text-xs outline-none focus:border-orange-500/50 text-slate-800 dark:text-slate-100"
                             />
                           </div>
                           <div className="space-y-1">
@@ -428,7 +434,7 @@ export function Navbar({
                               placeholder="Min. 8 characters"
                               value={regPassword}
                               onChange={(e) => setRegPassword(e.target.value)}
-                              className="w-full rounded-xl border border-slate-200 dark:border-slate-855 bg-slate-50 dark:bg-slate-955 px-3 py-2 text-xs outline-none focus:border-orange-500/50 text-slate-800 dark:text-slate-100"
+                              className="w-full rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950 px-3 py-2 text-xs outline-none focus:border-orange-500/50 text-slate-800 dark:text-slate-100"
                             />
                           </div>
                           <div className="space-y-1">
@@ -438,10 +444,10 @@ export function Navbar({
                               placeholder="••••••••"
                               value={regConfirmPassword}
                               onChange={(e) => setRegConfirmPassword(e.target.value)}
-                              className="w-full rounded-xl border border-slate-200 dark:border-slate-855 bg-slate-50 dark:bg-slate-955 px-3 py-2 text-xs outline-none focus:border-orange-500/50 text-slate-800 dark:text-slate-100"
+                              className="w-full rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950 px-3 py-2 text-xs outline-none focus:border-orange-500/50 text-slate-800 dark:text-slate-100"
                             />
                           </div>
-                          <label className="flex items-center gap-2 text-[10px] text-slate-450 select-none">
+                          <label className="flex items-center gap-2 text-[10px] text-slate-500 select-none">
                             <input
                               type="checkbox"
                               checked={regTerms}
@@ -453,8 +459,14 @@ export function Navbar({
                           <button
                             disabled={isSubmitting}
                             onClick={async () => {
-                              if (!regName.trim() || !regEmail.trim() || !regPassword || !regConfirmPassword) {
+                              const emailVal = regEmail.trim().toLowerCase();
+                              const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+                              if (!regName.trim() || !emailVal || !regPassword || !regConfirmPassword) {
                                 setAuthError("Please fill all fields");
+                                return;
+                              }
+                              if (!EMAIL_RE.test(emailVal)) {
+                                setAuthError("Please enter a valid email address");
                                 return;
                               }
                               if (regPassword !== regConfirmPassword) {
@@ -471,7 +483,7 @@ export function Navbar({
                               }
                               setIsSubmitting(true);
                               setAuthError(null);
-                              const ok = await onRegister(regName.trim(), regEmail.trim(), regPassword);
+                              const ok = await onRegister(regName.trim(), emailVal, regPassword);
                               setIsSubmitting(false);
                               if (ok) {
                                 setIsProfileOpen(false);
@@ -539,7 +551,7 @@ export function Navbar({
             animate={{ opacity: 1, height: "auto" }}
             exit={{ opacity: 0, height: 0 }}
             className={`md:hidden border-t ${
-              theme === "dark" ? "bg-slate-950 border-slate-900" : "bg-white border-slate-150"
+              theme === "dark" ? "bg-slate-950 border-slate-900" : "bg-white border-slate-200"
             } px-4 py-5 space-y-4`}
             id="mobile_nav_container"
           >

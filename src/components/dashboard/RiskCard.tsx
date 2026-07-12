@@ -84,7 +84,7 @@ export function RiskCard({ theme, result }: RiskCardProps) {
                     : "text-emerald-500"
                 }`}
               />
-              <span className="text-slate-450 font-sans text-base">/100</span>
+              <span className="text-slate-500 font-sans text-base">/100</span>
             </div>
             
             <div className="pt-1">
@@ -166,7 +166,7 @@ export function RiskCard({ theme, result }: RiskCardProps) {
 
       {/* Factors Breakdown Chart */}
       <div className={`p-6 sm:p-7 rounded-2xl ${bgCardClass} space-y-6 text-left`}>
-        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 border-b border-slate-150 dark:border-slate-800 pb-3">
+        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 border-b border-slate-200 dark:border-slate-800 pb-3">
           <div className="space-y-1">
             <div className="flex items-center gap-2 font-sans">
               <TrendingUp className="w-4 h-4 text-orange-500" />
@@ -192,7 +192,7 @@ export function RiskCard({ theme, result }: RiskCardProps) {
                 <div key={key} className="space-y-1">
                   <div className="flex justify-between items-center text-[11px] font-sans">
                     <span className="text-slate-655 dark:text-slate-350 font-medium">{label}</span>
-                    <span className="text-slate-450 font-semibold shrink-0 font-mono">
+                    <span className="text-slate-500 font-semibold shrink-0 font-mono">
                       {val} <span className="opacity-50 text-[9px]">/ {maxVal}</span>
                     </span>
                   </div>

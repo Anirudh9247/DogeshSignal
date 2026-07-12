@@ -3,13 +3,13 @@ import { motion } from "framer-motion";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { Mail } from "lucide-react";
 import Input from "../components/Input";
 import PasswordInput from "../components/PasswordInput";
 import Button from "../components/Button";
 import toast from "react-hot-toast";
 import { login as loginApi } from "../services/authService";
 import { useAuth } from "../context/AuthContext";
+import { DogeshLogo, FloatingSystemParticles } from "../components/BrandSystem";
 
 const loginSchema = z.object({
   email: z.string().email("Enter a valid email"),
@@ -32,35 +32,49 @@ const Login = () => {
 
   const onSubmit = async (data: LoginForm) => {
     try {
-        const response = await loginApi(data);
-        auth.login(response.data.token, response.data.user);
-        toast.success("Login Successful");
-        navigate("/dashboard");
+      const response = await loginApi(data);
+      auth.login(response.data.token, response.data.user);
+      toast.success("Login Successful");
+      navigate("/dashboard");
     } catch {
-        toast.error("Invalid Credentials");
+      toast.error("Invalid Credentials");
     }
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-950 via-gray-900 to-black flex items-center justify-center p-5">
+    <div className="min-h-screen flex flex-col font-sans relative overflow-x-hidden dark bg-slate-950 text-slate-100 items-center justify-center p-5">
+      <FloatingSystemParticles />
+      <div className="absolute top-[-5%] right-[-10%] w-[38%] h-[35%] bg-orange-950/20 rounded-full blur-[140px] pointer-events-none" />
+      <div className="absolute bottom-[-10%] left-[-10%] w-[40%] h-[40%] bg-amber-950/25 rounded-full blur-[140px] pointer-events-none" />
+
       <motion.div
         initial={{ opacity: 0, y: 40 }}
         animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: .5 }}
-        className="w-full max-w-md rounded-3xl border border-gray-800 bg-gray-900/70 backdrop-blur-xl p-8 shadow-2xl"
+        transition={{ duration: 0.5 }}
+        className="w-full max-w-md rounded-3xl border border-slate-800/80 bg-slate-900/70 backdrop-blur-xl p-8 shadow-2xl z-10"
       >
         <div className="text-center mb-8">
-          <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-cyan-500">
-            <Mail className="text-white" size={30} />
+          <div className="flex items-center gap-3 justify-center mb-6">
+            <div className="w-11 h-11 flex items-center justify-center">
+              <DogeshLogo className="w-11 h-11" />
+            </div>
+            <div className="text-left">
+              <span className="font-sans font-extrabold tracking-tight text-lg leading-none block text-white">
+                Dogesh Signal
+              </span>
+              <span className="text-[10px] font-sans font-bold tracking-wider text-orange-400 block leading-none mt-1 uppercase">
+                Instinct Radar
+              </span>
+            </div>
           </div>
-          <h1 className="text-3xl font-bold text-white">Welcome Back</h1>
-          <p className="mt-2 text-gray-400">Login to continue using Dogesh Signal</p>
+          <h1 className="text-3xl font-bold text-white tracking-tight">Welcome Back</h1>
+          <p className="mt-2 text-slate-400 text-xs">Login to continue using Dogesh Signal</p>
         </div>
 
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-5">
           <Input
             label="Email"
-            placeholder="Enter your email"
+            placeholder="you@domain.com"
             type="email"
             error={errors.email?.message}
             {...register("email")}
@@ -74,11 +88,11 @@ const Login = () => {
           />
 
           <div className="flex items-center justify-between">
-            <label className="flex items-center gap-2 text-gray-300 text-sm">
-              <input type="checkbox" className="accent-cyan-500" />
+            <label className="flex items-center gap-2 text-slate-300 text-xs cursor-pointer select-none">
+              <input type="checkbox" className="accent-orange-500 rounded" />
               Remember me
             </label>
-            <button type="button" className="text-cyan-400 hover:text-cyan-300 text-sm">
+            <button type="button" className="text-orange-400 hover:text-orange-300 text-xs font-semibold cursor-pointer">
               Forgot Password?
             </button>
           </div>
@@ -89,22 +103,22 @@ const Login = () => {
         </form>
 
         <div className="my-6 flex items-center">
-          <div className="h-px flex-1 bg-gray-700" />
-          <span className="px-4 text-gray-500 text-sm">OR</span>
-          <div className="h-px flex-1 bg-gray-700" />
+          <div className="h-px flex-1 bg-slate-800" />
+          <span className="px-4 text-slate-500 text-xs font-mono font-bold">OR</span>
+          <div className="h-px flex-1 bg-slate-800" />
         </div>
 
         <button 
           type="button"
           onClick={() => navigate("/dashboard")}
-          className="w-full cursor-pointer rounded-xl border border-gray-700 py-3 text-white transition hover:bg-gray-800"
+          className="w-full cursor-pointer rounded-xl border border-slate-800 py-3 text-slate-200 text-sm font-semibold transition hover:bg-slate-850"
         >
           Continue as Guest
         </button>
 
-        <p className="mt-6 text-center text-gray-400">
+        <p className="mt-6 text-center text-slate-400 text-xs">
           Don't have an account?{" "}
-          <Link to="/register" className="text-cyan-400 hover:text-cyan-300 font-semibold">
+          <Link to="/register" className="text-orange-400 hover:text-orange-300 font-semibold transition-colors">
             Register
           </Link>
         </p>

@@ -168,4 +168,37 @@ CREATE INDEX IF NOT EXISTS idx_analysis_history_user_created ON public.analysis_
 CREATE INDEX IF NOT EXISTS idx_payments_sub_status_created ON public.payments(subscription_id, status, created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_usage_user_reset ON public.usage(user_id, last_reset);
 
+-- 10. ATOMIC CONCURRENCY RPC FUNCTIONS
+-- Prevents race conditions on daily usage increments and credit pack consumption
+
+CREATE OR REPLACE FUNCTION public.increment_daily_usage(user_id_param UUID)
+RETURNS VOID AS $$
+DECLARE
+    today DATE := timezone('utc'::text, now())::DATE;
+BEGIN
+    INSERT INTO public.usage (user_id, analyses_today, last_reset)
+    VALUES (user_id_param, 1, now())
+    ON CONFLICT (user_id) DO UPDATE
+    SET 
+        analyses_today = CASE 
+            WHEN public.usage.last_reset::DATE = today THEN public.usage.analyses_today + 1
+            ELSE 1
+        END,
+        last_reset = CASE 
+            WHEN public.usage.last_reset::DATE = today THEN public.usage.last_reset
+            ELSE now()
+        END;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+CREATE OR REPLACE FUNCTION public.decrement_credit_pack(pack_id_param UUID)
+RETURNS VOID AS $$
+BEGIN
+    UPDATE public.credit_packs
+    SET remaining_credits = remaining_credits - 1
+    WHERE id = pack_id_param AND remaining_credits > 0;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+
 

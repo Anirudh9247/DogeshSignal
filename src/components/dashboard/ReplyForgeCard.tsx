@@ -61,7 +61,7 @@ export function ReplyForgeCard({
           </button>
         </div>
       )}
-      <div className="flex items-center justify-between border-b border-slate-150 dark:border-slate-800 pb-3 font-sans">
+      <div className="flex items-center justify-between border-b border-slate-200 dark:border-slate-800 pb-3 font-sans">
         <div className="flex items-center gap-2">
           <ShieldCheck className="w-4 h-4 text-emerald-500" />
           <h3 className="text-xs font-semibold text-slate-800 dark:text-slate-100">
@@ -137,7 +137,7 @@ export function ReplyForgeCard({
           </button>
         </div>
 
-        <div className="flex items-center justify-end pt-3 border-t border-slate-150 dark:border-slate-900/60 font-sans">
+        <div className="flex items-center justify-end pt-3 border-t border-slate-200 dark:border-slate-900/60 font-sans">
           <button
             onClick={() => handleCopyReplyText(editedReplyText, activeReplyTone)}
             className="px-4 py-1.5 bg-orange-500 hover:bg-orange-655 text-slate-950 font-sans font-semibold text-xs rounded-lg cursor-pointer transition-all flex items-center justify-center gap-1 border-none shadow-sm"

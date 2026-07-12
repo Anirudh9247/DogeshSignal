@@ -142,6 +142,22 @@ export const PLAN_ENTITLEMENTS: Record<PlanType, Entitlements> = {
   }
 };
 
+export const PLAN_IDS: Record<PlanType, string | null> = {
+  [PlanType.SNIFF]: null,
+  [PlanType.GUARD_MONTHLY]: "plan_guard_monthly_live_128938129",
+  [PlanType.GUARD_ANNUAL]: "plan_guard_yearly_live_128938130",
+  [PlanType.SHIELD_MONTHLY]: "plan_shield_monthly_live_128938131",
+  [PlanType.SHIELD_ANNUAL]: "plan_shield_yearly_live_128938132"
+};
+
+export const PLAN_AMOUNTS: Record<PlanType, number> = {
+  [PlanType.SNIFF]: 0,
+  [PlanType.GUARD_MONTHLY]: 499,
+  [PlanType.GUARD_ANNUAL]: 4900,
+  [PlanType.SHIELD_MONTHLY]: 1299,
+  [PlanType.SHIELD_ANNUAL]: 12900
+};
+
 // Simulated Auth Session Helper for testing the architecture in the client app
 export function getMockUser(): UserProfile | null {
   const data = localStorage.getItem("dogesh_mock_user");

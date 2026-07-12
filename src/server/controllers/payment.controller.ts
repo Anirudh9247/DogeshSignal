@@ -4,21 +4,7 @@ import { supabaseAdmin, isSupabaseConfiguredBackend } from "../utils/supabase";
 import { logEvent } from "../utils/logger";
 import { fetchWithRetry } from "../utils/fetch";
 import crypto from "crypto";
-
-export const PLAN_IDS: Record<string, string | null> = {
-  sniff: null,
-  guard_monthly: "plan_guard_monthly_live_128938129",
-  guard_annual: "plan_guard_yearly_live_128938130",
-  shield_monthly: "plan_shield_monthly_live_128938131",
-  shield_annual: "plan_shield_yearly_live_128938132"
-};
-
-export const PLAN_AMOUNTS: Record<string, number> = {
-  guard_monthly: 499,
-  guard_annual: 4900,
-  shield_monthly: 1299,
-  shield_annual: 12900
-};
+import { PlanType, PLAN_IDS, PLAN_AMOUNTS } from "../../plans/subscription";
 
 export async function createSubscription(req: AuthenticatedRequest, res: Response) {
   let paymentRecordId: string | null = null;
@@ -103,17 +89,26 @@ export async function createSubscription(req: AuthenticatedRequest, res: Respons
         subscriptionId = rzpData.id;
       } catch (rzpErr: any) {
         logEvent("ERROR", "Razorpay subscription creation failed, rolling back internal DB payment record", { userId, error: rzpErr.message });
-        if (isSupabaseConfiguredBackend() && paymentRecordId) {
+        if (paymentRecordId) {
           await supabaseAdmin.from("payments").delete().eq("id", paymentRecordId);
         }
         return res.status(502).json({ error: "Razorpay provider is currently unreachable. Please try again later." });
       }
     } else {
-      logEvent("WARN", "Razorpay credentials not configured. Generating mock subscription ID", { userId, subscriptionId });
+      if (process.env.ALLOW_MOCK_PAYMENTS !== "true") {
+        logEvent("WARN", "Razorpay credentials not configured and ALLOW_MOCK_PAYMENTS is not true. Blocking subscription creation.", { userId });
+        if (paymentRecordId) {
+          await supabaseAdmin.from("payments").delete().eq("id", paymentRecordId);
+        }
+        return res.status(501).json({
+          error: "Razorpay integration is not configured on the backend. To enable simulated upgrades in development, set ALLOW_MOCK_PAYMENTS=true in your .env file."
+        });
+      }
+      logEvent("WARN", "Razorpay credentials not configured. Generating mock subscription ID since ALLOW_MOCK_PAYMENTS is true", { userId, subscriptionId });
     }
 
     // 3. Update the pending subscription record with actual Razorpay Subscription ID
-    if (isSupabaseConfiguredBackend() && paymentRecordId) {
+    if (paymentRecordId) {
       const { error: updErr } = await supabaseAdmin
         .from("payments")
         .update({ subscription_id: subscriptionId })
@@ -160,7 +155,18 @@ export async function verifyPayment(req: AuthenticatedRequest, res: Response) {
         .update(`${razorpay_payment_id}|${razorpay_subscription_id}`)
         .digest("hex");
 
-      if (expectedSignature !== razorpay_signature) {
+      const expectedBuffer = Buffer.from(expectedSignature, "hex");
+      const receivedBuffer = Buffer.from(
+        razorpay_signature && expectedSignature.length === razorpay_signature.length 
+          ? razorpay_signature 
+          : expectedSignature, 
+        "hex"
+      );
+
+      const signaturesMatch = crypto.timingSafeEqual(expectedBuffer, receivedBuffer);
+      const isValid = (razorpay_signature && expectedSignature.length === razorpay_signature.length) && signaturesMatch;
+
+      if (!isValid) {
         logEvent("ERROR", "Payment signature verification failed", { userId, razorpay_payment_id });
         return res.status(400).json({ error: "Payment signature verification failed." });
       }

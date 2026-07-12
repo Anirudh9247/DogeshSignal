@@ -386,9 +386,8 @@ function DashboardView() {
       return;
     }
 
-    const userObj = getMockUser();
-    const activePlan = userObj ? userObj.plan : PlanType.SNIFF;
-    const email = userObj ? userObj.email : null;
+    const activePlan = user ? user.plan : PlanType.SNIFF;
+    const email = user ? user.email : null;
     const canScan = await usageService.checkDailyLimit(email, activePlan);
     if (!canScan) {
       setError(`Daily limit reached for ${activePlan.toUpperCase()} plan. Upgrade or try again tomorrow!`);

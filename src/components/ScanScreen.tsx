@@ -156,7 +156,7 @@ export function ScanScreen({
 
       {/* Onboarding hint banner */}
       <div className={`p-4 rounded-xl flex items-start gap-3 border transition-colors ${
-        theme === "dark" ? "bg-slate-900/40 border-slate-800/80" : "bg-slate-50 border-slate-150"
+        theme === "dark" ? "bg-slate-900/40 border-slate-800/80" : "bg-slate-50 border-slate-200"
       }`}>
         <Info className="w-4 h-4 text-orange-500 shrink-0 mt-0.5" />
         <p className="text-xs leading-relaxed text-slate-500 dark:text-slate-455">
@@ -391,14 +391,14 @@ export function ScanScreen({
 
           {/* Quick Informational Prompt Card */}
           <div className={`p-5 rounded-xl border flex gap-3 text-left transition-all duration-200 ${
-            theme === "dark" ? "bg-slate-950/40 border-slate-900 focus:border-slate-800" : "bg-slate-50 border-slate-150"
+            theme === "dark" ? "bg-slate-950/40 border-slate-900 focus:border-slate-800" : "bg-slate-50 border-slate-200"
           }`}>
             <Info className="w-4 h-4 text-orange-500 shrink-0 mt-0.5" />
             <div className="space-y-0.5">
-              <h4 className="text-xs font-semibold text-slate-700 dark:text-slate-205">
+              <h4 className="text-xs font-semibold text-slate-700 dark:text-slate-200">
                 How it works
               </h4>
-              <p className="text-[11px] text-slate-450 dark:text-slate-400 leading-relaxed font-sans">
+              <p className="text-[11px] text-slate-500 dark:text-slate-400 leading-relaxed font-sans">
                 Dogesh Signal cross-checks parameters across multiple pressure points, identifying standard conversation risks calmly.
               </p>
             </div>

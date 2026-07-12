@@ -33,18 +33,18 @@ export function ResultsDashboard({
     : "bg-white border border-slate-200 shadow-sm transition-all duration-200 hover:shadow-md";
 
   const handleExportPDF = () => {
-    exportAnalysisToPDF(result, entitlements.exportSummary);
+    exportAnalysisToPDF(result, entitlements.features["export.summary"]);
   };
 
   return (
     <div className="space-y-10 my-4 text-left" id="results_dashboard_root">
       
       {/* ACTION HEADER BAR */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-150 dark:border-slate-900 pb-4" id="results_header_actions">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-200 dark:border-slate-900 pb-4" id="results_header_actions">
         <button
           onClick={onScanAnother}
           className={`px-4 py-2 bg-transparent hover:bg-slate-500/5 text-xs font-semibold rounded-lg border transition-all duration-155 transform active:scale-98 flex items-center gap-1.5 cursor-pointer font-sans ${
-            theme === "dark" ? "border-slate-800 text-slate-400 hover:text-slate-205" : "border-slate-200 text-slate-600 hover:text-slate-950"
+            theme === "dark" ? "border-slate-800 text-slate-400 hover:text-slate-200" : "border-slate-200 text-slate-600 hover:text-slate-950"
           }`}
           id="results_btn_back"
         >
@@ -80,7 +80,7 @@ export function ResultsDashboard({
           <ReplyForgeCard
             theme={theme}
             result={result}
-            advancedRepliesAllowed={entitlements.advancedReplies}
+            advancedRepliesAllowed={entitlements.features["reply.smart"] || entitlements.features["reply.premium"]}
           />
         </div>
 
@@ -126,12 +126,12 @@ export function ResultsDashboard({
                 : "border-slate-200 text-slate-600 hover:text-slate-955 hover:bg-slate-50"
             }`}
           >
-            {entitlements.exportSummary ? (
+            {entitlements.features["export.summary"] ? (
               <FileText className="w-3.5 h-3.5 text-orange-500" />
             ) : (
               <span className="w-3.5 h-3.5 flex items-center justify-center text-slate-400">🔒</span>
             )}
-            <span>Export PDF {!entitlements.exportSummary && "(Premium)"}</span>
+            <span>Export PDF {!entitlements.features["export.summary"] && "(Premium)"}</span>
           </button>
 
           <button

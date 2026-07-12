@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 import { CreditCard, LogOut } from "lucide-react";
-import { PlanType, UserProfile, PLAN_ENTITLEMENTS } from "../../plans/subscription";
+import { PlanType, UserProfile, PLAN_ENTITLEMENTS, PLAN_IDS, PLAN_AMOUNTS } from "../../plans/subscription";
 import toast from "react-hot-toast";
 
 interface SubscriptionSectionProps {
@@ -10,21 +10,6 @@ interface SubscriptionSectionProps {
   onLogout: () => void;
   token: string | null;
 }
-
-export const PLAN_IDS: Record<string, string | null> = {
-  sniff: null,
-  guard_monthly: "plan_guard_monthly_live_128938129",
-  guard_yearly: "plan_guard_yearly_live_128938130",
-  shield_monthly: "plan_shield_monthly_live_128938131",
-  shield_yearly: "plan_shield_yearly_live_128938132"
-};
-
-export const PLAN_AMOUNTS: Record<string, number> = {
-  guard_monthly: 999,
-  guard_yearly: 9999,
-  shield_monthly: 2999,
-  shield_yearly: 29999
-};
 
 export function SubscriptionSection({
   theme,
@@ -41,8 +26,11 @@ export function SubscriptionSection({
   const activePlan = user.plan;
   const entitlements = PLAN_ENTITLEMENTS[activePlan];
 
-  const handleUpgrade = async (targetPlan: PlanType, cycle: "monthly" | "yearly") => {
+  const handleUpgrade = async (tier: "guard" | "shield", cycle: "monthly" | "yearly") => {
     setIsSimulatingPayment(true);
+    const targetPlan = (tier === "guard"
+      ? (cycle === "monthly" ? PlanType.GUARD_MONTHLY : PlanType.GUARD_ANNUAL)
+      : (cycle === "monthly" ? PlanType.SHIELD_MONTHLY : PlanType.SHIELD_ANNUAL)) as PlanType;
     try {
       const response = await fetch("/api/payments/create-subscription", {
         method: "POST",
@@ -57,7 +45,8 @@ export function SubscriptionSection({
       });
 
       if (!response.ok) {
-        throw new Error("Failed to initialize subscription checkout.");
+        const errData = await response.json().catch(() => ({}));
+        throw new Error(errData.error || "Failed to initialize subscription checkout.");
       }
 
       const orderData = await response.json();
@@ -127,9 +116,9 @@ export function SubscriptionSection({
 
   return (
     <div className={`p-6 rounded-2xl space-y-4.5 ${bgCardClass}`} id="cloud_sync_sub_card">
-      <div className="flex items-center gap-2 pb-3.5 border-b border-slate-150 dark:border-slate-800">
+      <div className="flex items-center gap-2 pb-3.5 border-b border-slate-200 dark:border-slate-800">
         <CreditCard className="w-4.5 h-4.5 text-orange-500" />
-        <h3 className="text-xs font-sans font-bold tracking-wider uppercase text-slate-800 dark:text-slate-205">
+        <h3 className="text-xs font-sans font-bold tracking-wider uppercase text-slate-850 dark:text-slate-200">
           Cloud Sync & Subscription
         </h3>
       </div>
@@ -150,7 +139,7 @@ export function SubscriptionSection({
           </div>
         </div>
 
-        {user.plan !== PlanType.SHIELD && (
+        {user.plan !== PlanType.SHIELD_MONTHLY && user.plan !== PlanType.SHIELD_ANNUAL && (
           <div className="pt-2 border-t border-slate-100 dark:border-slate-900/60 space-y-2.5">
             <div className="flex justify-between items-center pb-1">
               <span className="text-[10px] font-mono font-bold text-slate-400 uppercase tracking-widest block">
@@ -167,7 +156,7 @@ export function SubscriptionSection({
                       className={`px-2 py-0.5 rounded-md transition-all text-[8px] font-mono uppercase font-bold cursor-pointer border-none ${
                         isActive
                           ? "bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 shadow-sm"
-                          : "text-slate-400 hover:text-slate-900 dark:hover:text-slate-205 bg-transparent"
+                          : "text-slate-400 hover:text-slate-900 dark:hover:text-slate-200 bg-transparent"
                       }`}
                     >
                       {cycle}
@@ -180,7 +169,7 @@ export function SubscriptionSection({
             {isSimulatingPayment ? (
               <div className="p-3 bg-slate-950 rounded-xl border border-slate-850 flex flex-col items-center justify-center space-y-2 text-center">
                 <span className="w-4 h-4 rounded-full border-2 border-orange-500 border-t-transparent animate-spin" />
-                <span className="text-[10px] font-mono font-bold text-slate-450 uppercase tracking-wider">
+                <span className="text-[10px] font-mono font-bold text-slate-500 uppercase tracking-wider">
                   Connecting to Razorpay...
                 </span>
               </div>
@@ -188,19 +177,19 @@ export function SubscriptionSection({
               <div className="flex flex-col sm:flex-row gap-2">
                 {user.plan === PlanType.SNIFF && (
                   <button
-                    onClick={() => handleUpgrade(PlanType.GUARD, billingCycle)}
-                    className="flex-grow py-2 px-3 bg-slate-100 hover:bg-slate-200 dark:bg-slate-950 dark:hover:bg-slate-900 border border-slate-200 dark:border-slate-850 rounded-xl text-[10px] font-mono font-bold uppercase text-slate-700 dark:text-slate-200 flex items-center justify-center gap-1 cursor-pointer"
+                    onClick={() => handleUpgrade("guard", billingCycle)}
+                    className="flex-grow py-2 px-3 bg-slate-100 hover:bg-slate-200 dark:bg-slate-955 dark:hover:bg-slate-900 border border-slate-200 dark:border-slate-850 rounded-xl text-[10px] font-mono font-bold uppercase text-slate-700 dark:text-slate-200 flex items-center justify-center gap-1 cursor-pointer"
                   >
                     <CreditCard className="w-3.5 h-3.5 text-orange-500" />
-                    <span>Guard ({billingCycle === "monthly" ? "USD 9.99/mo" : "USD 99.99/yr"})</span>
+                    <span>Guard ({billingCycle === "monthly" ? `USD ${(PLAN_AMOUNTS[PlanType.GUARD_MONTHLY] / 100).toFixed(2)}/mo` : `USD ${(PLAN_AMOUNTS[PlanType.GUARD_ANNUAL] / 100).toFixed(2)}/yr`})</span>
                   </button>
                 )}
                 <button
-                  onClick={() => handleUpgrade(PlanType.SHIELD, billingCycle)}
+                  onClick={() => handleUpgrade("shield", billingCycle)}
                   className="flex-grow py-2 px-3 bg-orange-500 hover:bg-orange-450 text-slate-950 rounded-xl text-[10px] font-mono font-black uppercase tracking-wider flex items-center justify-center gap-1 cursor-pointer border-none"
                 >
                   <CreditCard className="w-3.5 h-3.5 text-slate-950" />
-                  <span>Shield ({billingCycle === "monthly" ? "USD 29.99/mo" : "USD 299.99/yr"})</span>
+                  <span>Shield ({billingCycle === "monthly" ? `USD ${(PLAN_AMOUNTS[PlanType.SHIELD_MONTHLY] / 100).toFixed(2)}/mo` : `USD ${(PLAN_AMOUNTS[PlanType.SHIELD_ANNUAL] / 100).toFixed(2)}/yr`})</span>
                 </button>
               </div>
             )}
@@ -208,7 +197,7 @@ export function SubscriptionSection({
         )}
 
         <div className="pt-2.5 border-t border-slate-100 dark:border-slate-900/60 flex justify-between items-center">
-          {entitlements.cloudHistory ? (
+          {entitlements.features["history.cloud"] ? (
             <span className="text-[9.5px] font-mono text-emerald-500 uppercase tracking-wider font-extrabold flex items-center gap-1.5 select-none">
               <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
               Cloud active

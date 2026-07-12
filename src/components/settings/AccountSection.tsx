@@ -1,6 +1,6 @@
 import React from "react";
 import { User, AlertCircle, ShieldCheck } from "lucide-react";
-import { PlanType, UserProfile } from "../../plans/subscription";
+import { PlanType, UserProfile, PLAN_ENTITLEMENTS } from "../../plans/subscription";
 
 interface AccountSectionProps {
   theme: "light" | "dark";
@@ -29,9 +29,9 @@ export function AccountSection({
 
   return (
     <div className={`p-6 rounded-2xl space-y-4.5 ${bgCardClass}`} id="account_sync_sub_card">
-      <div className="flex items-center gap-2 pb-3.5 border-b border-slate-150 dark:border-slate-800">
+      <div className="flex items-center gap-2 pb-3.5 border-b border-slate-200 dark:border-slate-800">
         <User className="w-4.5 h-4.5 text-orange-500" />
-        <h3 className="text-xs font-sans font-bold tracking-wider uppercase text-slate-800 dark:text-slate-205">
+        <h3 className="text-xs font-sans font-bold tracking-wider uppercase text-slate-805 dark:text-slate-200">
           Account Profile & Usage
         </h3>
       </div>
@@ -44,7 +44,7 @@ export function AccountSection({
           <div className="p-3 bg-orange-500/5 border border-orange-500/10 rounded-xl space-y-2">
             <span className="text-[10px] font-mono font-bold text-orange-500 block uppercase tracking-wider">Guest Session Benefits</span>
             <ul className="list-disc list-inside text-[10px] text-slate-400 space-y-1">
-              <li>Up to 10 scans per day</li>
+              <li>Up to {PLAN_ENTITLEMENTS[PlanType.SNIFF].limits["analysis.daily"]} scans per day</li>
               <li>Local history logging</li>
               <li>Draft boundaries & replies</li>
             </ul>

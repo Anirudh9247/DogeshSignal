@@ -27,20 +27,20 @@ export function SummaryCard({ theme, result }: SummaryCardProps) {
       
       {/* Why it feels off */}
       <div className={`p-6 sm:p-7 rounded-2xl ${bgCardClass} space-y-4`} id="card_why_flagged">
-        <div className="flex items-center gap-2 border-b border-slate-150 dark:border-slate-800 pb-3 font-sans">
+        <div className="flex items-center gap-2 border-b border-slate-200 dark:border-slate-800 pb-3 font-sans">
           <Info className="w-4 h-4 text-orange-500" />
           <h3 className="text-xs font-semibold text-slate-800 dark:text-slate-100">
             Why it feels off
           </h3>
         </div>
-        <p className="text-sm sm:text-base leading-relaxed text-slate-805 dark:text-slate-200 italic font-sans font-medium">
+        <p className="text-sm sm:text-base leading-relaxed text-slate-800 dark:text-slate-200 italic font-sans font-medium">
           "{result.executiveSummary || "This message creates pressure by mixing urgency, unclear expectations, or emotional leverage."}"
         </p>
       </div>
 
       {/* Signals to notice */}
       <div className={`p-6 sm:p-7 rounded-2xl ${bgCardClass} space-y-4`} id="card_red_flags">
-        <div className="flex items-center gap-2 border-b border-slate-150 dark:border-slate-800 pb-3 font-sans">
+        <div className="flex items-center gap-2 border-b border-slate-200 dark:border-slate-800 pb-3 font-sans">
           <ShieldAlert className="w-4 h-4 text-rose-500" />
           <h3 className="text-xs font-semibold text-slate-800 dark:text-slate-100">
             Signals to notice
@@ -69,7 +69,7 @@ export function SummaryCard({ theme, result }: SummaryCardProps) {
                   </span>
                 </div>
 
-                <div className="pl-3 border-l-2 border-orange-550/30 font-sans text-xs text-slate-500 dark:text-slate-400 italic">
+                <div className="pl-3 border-l-2 border-orange-500/30 font-sans text-xs text-slate-500 dark:text-slate-400 italic">
                   "{anomaly.evidenceSnippet}"
                 </div>
 
@@ -88,7 +88,7 @@ export function SummaryCard({ theme, result }: SummaryCardProps) {
 
       {/* Boundary tips */}
       <div className={`p-6 sm:p-7 rounded-2xl ${bgCardClass} space-y-4`} id="card_recommended_boundaries">
-        <div className="flex items-center gap-2 border-b border-slate-150 dark:border-slate-800 pb-3 font-sans">
+        <div className="flex items-center gap-2 border-b border-slate-200 dark:border-slate-800 pb-3 font-sans">
           <UserCheck className="w-4 h-4 text-orange-500" />
           <h3 className="text-xs font-semibold text-slate-800 dark:text-slate-100">
             Boundary tips
@@ -113,7 +113,7 @@ export function SummaryCard({ theme, result }: SummaryCardProps) {
 
       {/* Quoted evidence */}
       <div className={`p-6 sm:p-7 rounded-2xl ${bgCardClass} space-y-4`} id="card_evidence_from_message">
-        <div className="flex items-center gap-2 border-b border-slate-150 dark:border-slate-800 pb-3 font-sans">
+        <div className="flex items-center gap-2 border-b border-slate-200 dark:border-slate-800 pb-3 font-sans">
           <FileText className="w-4 h-4 text-slate-400 shrink-0" />
           <h3 className="text-xs font-semibold text-slate-850 dark:text-slate-100">
             Quoted evidence
@@ -121,9 +121,9 @@ export function SummaryCard({ theme, result }: SummaryCardProps) {
         </div>
 
         <div className={`p-4 rounded-xl border text-xs leading-relaxed italic ${
-          theme === "dark" ? "bg-slate-950/80 border-slate-805" : "bg-slate-50 border-slate-200"
+          theme === "dark" ? "bg-slate-950/80 border-slate-800" : "bg-slate-50 border-slate-200"
         }`}>
-          <div className="text-slate-705 dark:text-slate-300 font-sans not-italic">
+          <div className="text-slate-700 dark:text-slate-300 font-sans not-italic">
             "{result.messageText || "No message text available."}"
           </div>
         </div>
@@ -134,7 +134,7 @@ export function SummaryCard({ theme, result }: SummaryCardProps) {
         
         {/* Pressure patterns */}
         <div className={`p-5 rounded-2xl ${bgCardClass} space-y-4`} id="card_hidden_pressure_signals">
-          <div className="flex items-center gap-2 border-b border-slate-150 dark:border-slate-800 pb-2.5 font-sans">
+          <div className="flex items-center gap-2 border-b border-slate-200 dark:border-slate-800 pb-2.5 font-sans">
             <AlertTriangle className="w-4 h-4 text-orange-500 shrink-0" />
             <h3 className="text-xs font-semibold text-slate-800 dark:text-slate-100">
               Pressure patterns
@@ -145,7 +145,7 @@ export function SummaryCard({ theme, result }: SummaryCardProps) {
             <div className="space-y-3.5">
               {result.stylisticSubtextIndicators.map((sub, idx) => (
                 <div key={idx} className="space-y-1">
-                  <span className="font-semibold text-xs text-orange-505 font-sans block text-left">
+                  <span className="font-semibold text-xs text-orange-500 font-sans block text-left">
                     {sub.hint}
                   </span>
                   <p className="text-[11.5px] leading-relaxed text-slate-500 dark:text-slate-400 font-sans text-left">
@@ -161,7 +161,7 @@ export function SummaryCard({ theme, result }: SummaryCardProps) {
 
         {/* What to verify */}
         <div className={`p-5 rounded-2xl ${bgCardClass} space-y-4`} id="card_what_to_check_next">
-          <div className="flex items-center gap-2 border-b border-slate-150 dark:border-slate-800 pb-2.5 font-sans">
+          <div className="flex items-center gap-2 border-b border-slate-200 dark:border-slate-800 pb-2.5 font-sans">
             <Eye className="w-4 h-4 text-emerald-500 shrink-0" />
             <h3 className="text-xs font-semibold text-slate-800 dark:text-slate-100">
               What to verify
@@ -175,7 +175,7 @@ export function SummaryCard({ theme, result }: SummaryCardProps) {
 
         {/* Nuance */}
         <div className={`p-5 rounded-2xl ${bgCardClass} space-y-4`} id="card_things_to_keep_mind">
-          <div className="flex items-center gap-2 border-b border-slate-150 dark:border-slate-800 pb-2.5 font-sans">
+          <div className="flex items-center gap-2 border-b border-slate-200 dark:border-slate-800 pb-2.5 font-sans">
             <Bookmark className="w-4 h-4 text-orange-500 shrink-0" />
             <h3 className="text-xs font-semibold text-slate-800 dark:text-slate-100">
               Nuance

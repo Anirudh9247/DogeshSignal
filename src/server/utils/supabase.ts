@@ -10,5 +10,5 @@ export const supabaseAdmin = createClient(
 );
 
 export const isSupabaseConfiguredBackend = (): boolean => {
-  return !!supabaseUrl && supabaseUrl !== "https://placeholder-project.supabase.co" && !!supabaseServiceKey;
+  return !!supabaseUrl && supabaseUrl !== "https://placeholder-project.supabase.co" && (!!supabaseServiceKey || !!supabaseAnonKey);
 };

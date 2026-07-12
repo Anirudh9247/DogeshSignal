@@ -60,7 +60,7 @@ export function SettingsScreen({
       </div>
 
       {/* Header block with helper caption */}
-      <div className="border-b border-slate-150 dark:border-slate-900 pb-5">
+      <div className="border-b border-slate-200 dark:border-slate-900 pb-5">
         <h2 className={`text-xl font-extrabold tracking-tight ${titleClass}`}>Settings & Preferences</h2>
         <p className={`text-xs ${mutedClass} mt-1`}>
           Choose the view and notification style that feels best for you.

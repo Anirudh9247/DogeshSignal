@@ -2,6 +2,7 @@ import { runAuthTests } from "./auth.test";
 import { runPaymentTests } from "./payment.test";
 import { runAnalysisTests } from "./analysis.test";
 import { runHistoryTests } from "./history.test";
+import { runPricingConsistencyTests } from "./pricing-consistency.test";
 
 async function main() {
   console.log("==========================================");
@@ -9,6 +10,7 @@ async function main() {
   console.log("==========================================\n");
 
   try {
+    await runPricingConsistencyTests();
     await runAuthTests();
     await runPaymentTests();
     await runAnalysisTests();

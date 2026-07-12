@@ -49,7 +49,8 @@ export function useScan() {
       });
 
       if (!response.ok) {
-        throw new Error(`Analyze API failed with status ${response.status}`);
+        const errData = await response.json().catch(() => ({}));
+        throw new Error(errData.error || `Analyze API failed with status ${response.status}`);
       }
 
       const data: AnalysisResult = await response.json();
