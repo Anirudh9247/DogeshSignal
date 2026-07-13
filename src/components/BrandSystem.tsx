@@ -3,122 +3,31 @@ import { motion, AnimatePresence } from "motion/react";
 import { HelpCircle, Copy, Check, Grid, Palette, Shield } from "lucide-react";
 
 /**
- * 1. MINIMAL GEOMETRIC INSTINCT LOGO
- * A highly polished abstract monoline mark combining alert points 
- * (representing natural intuition and active listening) with gentle 
- * concentric signal curves representing calm awareness.
+ * 1. BRAND LOGO
+ * The official Dogesh Signal shield logo — an orange shield with a
+ * stylised D·S monogram and signal arcs representing active sensing.
  */
 export function DogeshLogo({ className = "w-8 h-8", animate = true }) {
   return (
-    <div className={`relative ${className} flex items-center justify-center shrink-0`} id="brand_dogesh_logo">
-      <svg
-        viewBox="0 0 100 100"
-        fill="none"
-        xmlns="http://www.w3.org/2000/svg"
-        className="w-full h-full"
-      >
-        <defs>
-          <linearGradient id="shield-gradient" x1="20" y1="15" x2="80" y2="85" gradientUnits="userSpaceOnUse">
-            <stop offset="0%" stopColor="#f97316" />
-            <stop offset="100%" stopColor="#ea580c" />
-          </linearGradient>
-        </defs>
-
-        <style>
-          {`
-            @keyframes needle-scan {
-              0%, 100% { transform: rotate(0deg); }
-              25% { transform: rotate(-2deg); }
-              75% { transform: rotate(3deg); }
-            }
-            @keyframes wave-glow {
-              0%, 100% { opacity: 0.25; }
-              50% { opacity: 0.6; }
-            }
-            .animated-needle {
-              transform-origin: 50px 53px;
-              animation: needle-scan 1.2s infinite ease-in-out;
-            }
-            .animated-wave {
-              animation: wave-glow 2s infinite ease-in-out;
-            }
-            .wave-delay-1 {
-              animation-delay: 0.3s;
-            }
-            .wave-delay-2 {
-              animation-delay: 0.6s;
-            }
-          `}
-        </style>
-
-        {/* 1. Concentric Open Waves (Radar) */}
-        <circle 
-          cx="50" 
-          cy="53" 
-          r="10" 
-          className={`stroke-slate-400/35 ${animate ? 'animated-wave' : ''}`}
-          strokeWidth="2.5" 
-          fill="none" 
-          strokeDasharray="48 15" 
-          strokeDashoffset="10" 
-        />
-        <circle 
-          cx="50" 
-          cy="53" 
-          r="18" 
-          className={`stroke-slate-400/30 ${animate ? 'animated-wave wave-delay-1' : ''}`}
-          strokeWidth="2.5" 
-          fill="none" 
-          strokeDasharray="86 25" 
-          strokeDashoffset="15" 
-        />
-        <circle 
-          cx="50" 
-          cy="53" 
-          r="26" 
-          className={`stroke-slate-400/20 ${animate ? 'animated-wave wave-delay-2' : ''}`}
-          strokeWidth="2.5" 
-          fill="none" 
-          strokeDasharray="124 35" 
-          strokeDashoffset="20" 
-        />
-
-        {/* 2. Symmetrical Shield Speech-Bubble Outline */}
-        <path
-          d="M 50 16
-             L 76 26
-             C 82 46, 82 66, 75 76
-             C 68 83, 56 86, 50 86
-             C 43 86, 33 84, 23 88
-             C 21 89, 21 86, 24 81
-             C 19 72, 18 46, 24 26
-             Z"
-          fill="none"
-          stroke="url(#shield-gradient)"
-          strokeWidth="5"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-        />
-
-        {/* 3. Speedometer Needle and Hub */}
-        <g className={animate ? "animated-needle" : ""}>
-          <line 
-            x1="50" 
-            y1="53" 
-            x2="71" 
-            y2="32" 
-            stroke="#f97316" 
-            strokeWidth="4" 
-            strokeLinecap="round" 
-          />
-          <circle 
-            cx="50" 
-            cy="53" 
-            r="4.5" 
-            fill="#f97316" 
-          />
-        </g>
-      </svg>
+    <div
+      className={`relative ${className} flex items-center justify-center shrink-0`}
+      id="brand_dogesh_logo"
+      style={animate ? {
+        animation: "logo-pulse 2.4s ease-in-out infinite",
+      } : undefined}
+    >
+      <style>{`
+        @keyframes logo-pulse {
+          0%, 100% { filter: drop-shadow(0 0 4px #f9731640); }
+          50%       { filter: drop-shadow(0 0 10px #f9731680); }
+        }
+      `}</style>
+      <img
+        src="/logo.png"
+        alt="Dogesh Signal logo"
+        className="w-full h-full object-contain"
+        draggable={false}
+      />
     </div>
   );
 }
