@@ -5,6 +5,7 @@ import { logEvent } from "../utils/logger";
 import { fetchWithRetry } from "../utils/fetch";
 import crypto from "crypto";
 import { PlanType, PLAN_IDS, PLAN_AMOUNTS } from "../../plans/subscription";
+import { PaymentStatus } from "../utils/paymentStates";
 
 export async function createSubscription(req: AuthenticatedRequest, res: Response) {
   let paymentRecordId: string | null = null;
@@ -36,12 +37,14 @@ export async function createSubscription(req: AuthenticatedRequest, res: Respons
       const { data: paymentRecord, error: dbError } = await supabaseAdmin
         .from("payments")
         .insert({
-          user_id: userId,
+          user_id:         userId,
           subscription_id: `pending_${Date.now()}`,
           amount,
           currency,
-          status: "PENDING",
-          verified: false
+          status:          PaymentStatus.PENDING,
+          verified:        false,
+          created_at:      new Date().toISOString(),
+          updated_at:      new Date().toISOString()
         })
         .select()
         .single();
@@ -59,7 +62,7 @@ export async function createSubscription(req: AuthenticatedRequest, res: Respons
 
     if (hasRazorpayConfig) {
       try {
-        const authHeader = Buffer.from(`${process.env.VITE_RAZORPAY_KEY_ID}:${process.env.RAZORPAY_KEY_SECRET}`).toString("base64");
+        const authHeader = Buffer.from(`${process.env.RAZORPAY_KEY_ID}:${process.env.RAZORPAY_KEY_SECRET}`).toString("base64");
         const rzpResponse = await fetchWithRetry("https://api.razorpay.com/v1/subscriptions", {
           method: "POST",
           headers: {
@@ -119,20 +122,31 @@ export async function createSubscription(req: AuthenticatedRequest, res: Respons
       }
     }
 
-    // Log payment audit event
+    // Append-only audit log
     if (isSupabaseConfiguredBackend()) {
       await supabaseAdmin.from("payment_logs").insert({
-        user_id: userId,
+        user_id:    userId,
         event_type: "subscription.created_pending",
-        payload: { planType, subscriptionId, internalId: paymentRecordId }
+        payload: {
+          plan_type:       planType,
+          subscription_id: subscriptionId,
+          internal_id:     paymentRecordId,
+          created_at:      new Date().toISOString()
+        }
       });
     }
+
+    logEvent("INFO", "payment_created", {
+      userId, planType, billingCycle,
+      subscriptionId, internalId: paymentRecordId,
+      created_at: new Date().toISOString()
+    });
 
     logEvent("INFO", "Subscription checkout initiated successfully", { userId, subscriptionId });
 
     return res.json({
       subscriptionId,
-      keyId: process.env.VITE_RAZORPAY_KEY_ID || "rzp_test_placeholder"
+      keyId: process.env.RAZORPAY_KEY_ID || "rzp_test_placeholder"
     });
   } catch (error: any) {
     logEvent("ERROR", "Failed to create subscription", { userId, error: error.message });
@@ -147,28 +161,33 @@ export async function verifyPayment(req: AuthenticatedRequest, res: Response) {
 
     logEvent("INFO", "Initiating subscription payment verification", { userId, razorpay_payment_id, razorpay_subscription_id });
 
-    // 1. Signature Verification
+    // 1. Signature Verification (subscription flow: payment_id|subscription_id)
     const hasRazorpayConfig = !!process.env.RAZORPAY_KEY_SECRET && process.env.RAZORPAY_KEY_SECRET !== "placeholder-secret";
     if (hasRazorpayConfig) {
       const expectedSignature = crypto
-        .createHmac("sha256", process.env.RAZORPAY_KEY_SECRET || "")
+        .createHmac("sha256", process.env.RAZORPAY_KEY_SECRET!)
         .update(`${razorpay_payment_id}|${razorpay_subscription_id}`)
         .digest("hex");
 
-      const expectedBuffer = Buffer.from(expectedSignature, "hex");
-      const receivedBuffer = Buffer.from(
-        razorpay_signature && expectedSignature.length === razorpay_signature.length 
-          ? razorpay_signature 
-          : expectedSignature, 
-        "hex"
-      );
-
-      const signaturesMatch = crypto.timingSafeEqual(expectedBuffer, receivedBuffer);
-      const isValid = (razorpay_signature && expectedSignature.length === razorpay_signature.length) && signaturesMatch;
+      let isValid = false;
+      try {
+        isValid =
+          !!razorpay_signature &&
+          expectedSignature.length === razorpay_signature.length &&
+          crypto.timingSafeEqual(
+            Buffer.from(expectedSignature, "hex"),
+            Buffer.from(razorpay_signature, "hex")
+          );
+      } catch {
+        isValid = false;
+      }
 
       if (!isValid) {
-        logEvent("ERROR", "Payment signature verification failed", { userId, razorpay_payment_id });
-        return res.status(400).json({ error: "Payment signature verification failed." });
+        logEvent("ERROR", "payment_verification_failed", {
+          userId, razorpay_payment_id, reason: "HMAC_SIGNATURE_MISMATCH"
+        });
+        // 422 Unprocessable Entity: well-formed request but signature is semantically invalid
+        return res.status(422).json({ error: "Payment signature is invalid." });
       }
     } else {
       logEvent("WARN", "Mock Mode: Bypassing signature verification", { userId });
@@ -187,13 +206,13 @@ export async function verifyPayment(req: AuthenticatedRequest, res: Response) {
         return res.json({ success: true, message: "Payment already verified." });
       }
 
-      // 3. Update the payment row
+      // 3. Update the payment row: transition to CAPTURED
       await supabaseAdmin
         .from("payments")
         .update({
           payment_id: razorpay_payment_id,
-          status: "ACTIVE",
-          verified: true,
+          status:     PaymentStatus.CAPTURED,
+          verified:   true,
           updated_at: new Date().toISOString()
         })
         .eq("subscription_id", razorpay_subscription_id);
@@ -212,11 +231,22 @@ export async function verifyPayment(req: AuthenticatedRequest, res: Response) {
         return res.status(500).json({ error: "Failed to update profile subscription status." });
       }
 
-      // Log payment audit event
+      // Append-only audit log
       await supabaseAdmin.from("payment_logs").insert({
-        user_id: userId,
-        event_type: "payment.verified",
-        payload: { razorpay_payment_id, razorpay_subscription_id, planType }
+        user_id:    userId,
+        event_type: "payment_verified",
+        payload: {
+          razorpay_payment_id,
+          razorpay_subscription_id,
+          plan_type:   planType,
+          status:      PaymentStatus.CAPTURED,
+          verified_at: new Date().toISOString()
+        }
+      });
+
+      logEvent("INFO", "payment_verified", {
+        userId, razorpay_payment_id, razorpay_subscription_id, planType,
+        verified_at: new Date().toISOString()
       });
     } else {
       logEvent("WARN", "Mock Mode: Skipping database persistence for verify-payment", { userId });
@@ -305,7 +335,7 @@ export async function restoreSubscription(req: AuthenticatedRequest, res: Respon
 
       if (hasRazorpayConfig && subscriptionId && !subscriptionId.startsWith("sub_mock_")) {
         try {
-          const authHeader = Buffer.from(`${process.env.VITE_RAZORPAY_KEY_ID}:${process.env.RAZORPAY_KEY_SECRET}`).toString("base64");
+          const authHeader = Buffer.from(`${process.env.RAZORPAY_KEY_ID}:${process.env.RAZORPAY_KEY_SECRET}`).toString("base64");
           const rzpResponse = await fetchWithRetry(`https://api.razorpay.com/v1/subscriptions/${subscriptionId}`, {
             method: "GET",
             headers: {
@@ -370,7 +400,7 @@ export async function cancelSubscription(req: AuthenticatedRequest, res: Respons
     const hasRazorpayConfig = !!process.env.RAZORPAY_KEY_SECRET && process.env.RAZORPAY_KEY_SECRET !== "placeholder-secret";
 
     if (hasRazorpayConfig && !subscriptionId.startsWith("sub_mock_")) {
-      const authHeader = Buffer.from(`${process.env.VITE_RAZORPAY_KEY_ID}:${process.env.RAZORPAY_KEY_SECRET}`).toString("base64");
+      const authHeader = Buffer.from(`${process.env.RAZORPAY_KEY_ID}:${process.env.RAZORPAY_KEY_SECRET}`).toString("base64");
       const cancelResponse = await fetchWithRetry(`https://api.razorpay.com/v1/subscriptions/${subscriptionId}/cancel`, {
         method: "POST",
         headers: {
