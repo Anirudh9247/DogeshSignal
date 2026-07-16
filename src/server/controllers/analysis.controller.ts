@@ -31,18 +31,15 @@ export async function analyzeMessage(req: AuthenticatedRequest, res: Response) {
     let targetPack: any = null;
     let currentUsageRow: any = null;
 
-    // ── Admin / tester bypass — skip all limit checks ─────────────────────
+    // Admin check and daily limit validation
     if (!req.user.isAdmin && isSupabaseConfiguredBackend()) {
-    // ──────────────────────────────────────────────────────────────────────
       const { data: profile } = await supabaseAdmin
         .from("profiles")
         .select("plan")
         .eq("id", req.user.id)
         .single();
       
-      if (profile) {
-        plan = profile.plan || "sniff";
-      }
+      if (profile) plan = profile.plan || "sniff";
 
       const entitlements = PLAN_ENTITLEMENTS[plan as PlanType] || PLAN_ENTITLEMENTS[PlanType.SNIFF];
       const limit = entitlements.limits["analysis.daily"];
@@ -60,13 +57,11 @@ export async function analyzeMessage(req: AuthenticatedRequest, res: Response) {
 
         if (usage) {
           const dbResetDate = new Date(usage.last_reset).toISOString().split("T")[0];
-          if (dbResetDate === today) {
-            analysesToday = usage.analyses_today;
-          }
+          if (dbResetDate === today) analysesToday = usage.analyses_today;
         }
 
         if (analysesToday >= limit) {
-          // Check credit packs
+          // Check active credit packs
           const { data: packs, error: fetchErr } = await supabaseAdmin
             .from("credit_packs")
             .select("*")
@@ -112,12 +107,11 @@ export async function analyzeMessage(req: AuthenticatedRequest, res: Response) {
           })[0];
         }
       }
-    } // end non-admin limit check
-
+    }
 
     const ai = getAiClient();
 
-    // Setup detailed system instruction guidelines based on the rules.
+    // Coach vetting guidelines for Gemini
     const systemInstruction = `You are a professional communication coach and boundary assistant for Dogesh Signal (a trustworthy message-analysis assistant that helps users understand tone, risk levels, and pressure patterns in text messages).
 
 Your objective is to analyze the user-provided text message with extreme precision according to these rules:
@@ -260,13 +254,14 @@ Message to analyze:
 ${message}
 """`;
 
-    // Requesting a structured JSON output
+    // Request structured JSON output from Gemini
     const response = await ai.models.generateContent({
       model: modelName,
       contents: userPrompt,
       config: {
         systemInstruction,
         responseMimeType: "application/json",
+        temperature: 0.1,
         responseSchema: {
           type: Type.OBJECT,
           required: [
@@ -375,7 +370,7 @@ ${message}
                   severity: { type: Type.STRING },
                   rationale: { type: Type.STRING },
                   evidenceSnippet: { type: Type.STRING }
-                }
+				}
               }
             },
             stylisticSubtextIndicators: {
@@ -424,14 +419,13 @@ ${message}
 
     const result = JSON.parse(response.text.trim());
 
+    // Update usage stats for non-admin profiles
     if (!req.user.isAdmin && isSupabaseConfiguredBackend()) {
       try {
         if (usageSource === "credit" && targetPack) {
-          // Attempt atomic credit pack decrement RPC
           const { error: rpcErr } = await supabaseAdmin.rpc("decrement_credit_pack", { pack_id_param: targetPack.id });
           
           if (rpcErr && rpcErr.code === "42883") {
-            // Fallback to read-then-write if RPC function is not yet deployed
             await supabaseAdmin
               .from("credit_packs")
               .update({ remaining_credits: targetPack.remaining_credits - 1 })
@@ -447,11 +441,9 @@ ${message}
             metadata: { description: "Daily limit exceeded scan consumption", packId: targetPack.id }
           });
         } else {
-          // Attempt atomic usage increment RPC
           const { error: rpcErr } = await supabaseAdmin.rpc("increment_daily_usage", { user_id_param: req.user.id });
           
           if (rpcErr && rpcErr.code === "42883") {
-            // Fallback to read-then-write if RPC function is not yet deployed
             const currentCount = currentUsageRow ? currentUsageRow.analyses_today : 0;
             await supabaseAdmin
               .from("usage")
@@ -464,7 +456,7 @@ ${message}
       } catch (dbErr: any) {
         logEvent("WARN", "Server-side usage increment failed", { userId: req.user.id, error: dbErr.message });
       }
-    } // end non-admin usage write
+    }
 
     return res.json(result);
 
