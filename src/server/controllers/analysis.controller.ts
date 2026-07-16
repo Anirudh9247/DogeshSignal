@@ -19,10 +19,12 @@ function getAiClient(): GoogleGenAI {
 
 export async function analyzeMessage(req: AuthenticatedRequest, res: Response) {
   try {
-    const { message, enableReplyForge } = req.body;
+    const { message, enableReplyForge, model } = req.body;
     if (!message || typeof message !== "string" || message.trim() === "") {
       return res.status(400).json({ error: "Message is required and must be a string." });
     }
+
+    const modelName = model || process.env.GEMINI_MODEL || "gemini-3.5-flash";
 
     let plan = "sniff";
     let usageSource: "plan" | "credit" = "plan";
@@ -260,7 +262,7 @@ ${message}
 
     // Requesting a structured JSON output
     const response = await ai.models.generateContent({
-      model: "gemini-3.5-flash",
+      model: modelName,
       contents: userPrompt,
       config: {
         systemInstruction,
