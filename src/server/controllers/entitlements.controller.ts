@@ -26,6 +26,7 @@ export async function getUserEntitlements(req: AuthenticatedRequest, res: Respon
           analysesToday: 0,
           packCreditsRemaining: 999999,
         },
+        mockPaymentsAllowed: process.env.ALLOW_MOCK_PAYMENTS === "true"
       });
     }
     // ──────────────────────────────────────────────────────────────────────
@@ -94,7 +95,8 @@ export async function getUserEntitlements(req: AuthenticatedRequest, res: Respon
       usage: {
         analysesToday,
         packCreditsRemaining
-      }
+      },
+      mockPaymentsAllowed: process.env.ALLOW_MOCK_PAYMENTS === "true"
     });
   } catch (err: any) {
     return res.status(500).json({ error: "Failed to resolve entitlements.", details: err.message });

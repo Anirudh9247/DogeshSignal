@@ -2,6 +2,7 @@ import React, { useState, useRef } from "react";
 import { CreditCard, LogOut, ShieldCheck, Zap, AlertCircle } from "lucide-react";
 import { PlanType, UserProfile, PLAN_ENTITLEMENTS } from "../../plans/subscription";
 import toast from "react-hot-toast";
+import { useAuth } from "../../context/AuthContext";
 
 interface SubscriptionSectionProps {
   theme: "light" | "dark";
@@ -13,8 +14,8 @@ interface SubscriptionSectionProps {
 
 // Display-only labels for the UI (never used as payment amounts)
 const PLAN_DISPLAY: Record<string, { monthly: string; annual: string }> = {
-  guard:  { monthly: "₹499/mo",   annual: "₹4,900/yr" },
-  shield: { monthly: "₹1,299/mo", annual: "₹12,900/yr" }
+  guard:  { monthly: "$4.99/mo",   annual: "$49/yr" },
+  shield: { monthly: "$12.99/mo", annual: "$129/yr" }
 };
 
 /** Exponential backoff delay: 2s → 4s → 8s */
@@ -82,6 +83,7 @@ export function SubscriptionSection({
   onLogout,
   token
 }: SubscriptionSectionProps) {
+  const { entitlements: authEntitlements } = useAuth();
   const [isProcessing, setIsProcessing]   = useState(false);
   const [billingCycle, setBillingCycle]   = useState<"monthly" | "yearly">("monthly");
   const [paymentError, setPaymentError]   = useState<string | null>(null);
@@ -348,6 +350,19 @@ export function SubscriptionSection({
             <span className="font-mono text-[9px] text-slate-400 truncate max-w-[150px]">{user.id}</span>
           </div>
         </div>
+
+        {/* Sandbox Mock Payments Warning Banner */}
+        {authEntitlements?.mockPaymentsAllowed && (
+          <div className="flex items-start gap-2.5 p-3 bg-amber-500/10 border border-amber-500/20 rounded-xl">
+            <AlertCircle className="w-3.5 h-3.5 text-amber-500 shrink-0 mt-0.5" />
+            <div className="space-y-0.5 text-left">
+              <p className="text-[9.5px] font-mono font-bold text-amber-500 uppercase tracking-wider">Sandbox Mode Active</p>
+              <p className="text-[9px] font-mono text-slate-500 dark:text-slate-400 leading-relaxed">
+                Mock payments are enabled. Upgrades will not trigger real billing.
+              </p>
+            </div>
+          </div>
+        )}
 
         {/* Payment error banner */}
         {paymentError && (

@@ -52,7 +52,7 @@ export async function processWebhook(req: Request, res: Response) {
     const subscriptionId  = subscription?.id || body.payload?.entity?.subscription_id || null;
     const paymentId       = payment?.id || body.payload?.entity?.id || null;
     const amount          = payment?.amount || subscription?.amount || 0;
-    const currency        = payment?.currency || subscription?.currency || "INR";
+    const currency        = payment?.currency || subscription?.currency || "USD";
 
     // Notes metadata injected during subscription/order creation
     const notes  = subscription?.notes || payment?.notes || {};
@@ -67,9 +67,13 @@ export async function processWebhook(req: Request, res: Response) {
       "plan_shield_yearly_live_128938132": "shield_annual"
     };
     const AMOUNT_PLAN_MAP: Record<number, string> = {
+      499:     "guard_monthly",
       49900:   "guard_monthly",
+      4900:    "guard_annual",
       490000:  "guard_annual",
+      1299:    "shield_monthly",
       129900:  "shield_monthly",
+      12900:   "shield_annual",
       1290000: "shield_annual"
     };
 
