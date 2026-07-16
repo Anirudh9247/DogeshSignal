@@ -1,0 +1,51 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 220" fill="none">
+  <defs>
+    <clipPath id="shield-clip">
+      <path d="M100 15 L172 42 C180 75 178 128 158 155 C140 178 120 188 100 188 C80 188 60 178 42 155 C22 128 20 75 28 42 Z"/>
+    </clipPath>
+  </defs>
+
+  <!-- Shield background (orange) -->
+  <path
+    d="M100 15 L172 42 C180 75 178 128 158 155 C140 178 120 188 100 188 C80 188 60 178 42 155 C22 128 20 75 28 42 Z"
+    fill="#F97316"
+  />
+
+  <!-- Central vertical dividing line (black stripe) -->
+  <rect x="95" y="15" width="10" height="173" fill="#0a0a0a" clip-path="url(#shield-clip)"/>
+
+  <!-- Left side: D-shape (negative space = letter D) -->
+  <!-- Black fill on left half to show D-shaped opening -->
+  <path
+    d="M28 42 L95 42 L95 188 C80 188 60 178 42 155 C22 128 20 75 28 42 Z"
+    fill="#0a0a0a"
+  />
+  <!-- D opening (orange arc) -->
+  <path
+    d="M60 55 L95 55 C95 55 115 70 115 100 C115 130 95 145 95 145 L60 145 Z"
+    fill="#F97316"
+  />
+  <path
+    d="M60 55 L60 145"
+    stroke="#0a0a0a"
+    stroke-width="2"
+    fill="none"
+  />
+
+  <!-- Right side: Signal/wifi arcs (S shape with arcs) -->
+  <path
+    d="M105 42 L172 42 C180 75 178 128 158 155 L105 155 Z"
+    fill="#0a0a0a"
+  />
+  <!-- Signal arcs (orange) -->
+  <path d="M112 75 C125 75 136 86 136 100" stroke="#F97316" stroke-width="9" stroke-linecap="round" fill="none"/>
+  <path d="M112 91 C119 91 126 98 126 106" stroke="#F97316" stroke-width="9" stroke-linecap="round" fill="none"/>
+  <!-- Lower S curve -->
+  <path
+    d="M150 110 C150 125 138 132 125 130 C112 128 108 120 115 112 C122 104 138 105 142 115 C146 125 138 138 122 140 C108 142 105 132 108 125"
+    stroke="#F97316"
+    stroke-width="9"
+    stroke-linecap="round"
+    fill="none"
+  />
+</svg>

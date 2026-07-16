@@ -111,7 +111,7 @@ export function LandingScreen({ theme, onLaunchScan, onLaunchExample }: LandingS
           <div className={`p-6 rounded-2xl ${bgCardClass} border text-left`}>
             
             {/* Top Bar showing example analysis */}
-            <div className="flex items-center justify-between pb-3.5 border-b border-slate-150 dark:border-slate-800/60 mb-4 select-none">
+            <div className="flex items-center justify-between pb-3.5 border-b border-slate-200 dark:border-slate-800/60 mb-4 select-none">
               <span className="text-xs font-semibold text-slate-400">
                 Example analysis
               </span>
@@ -146,7 +146,7 @@ export function LandingScreen({ theme, onLaunchScan, onLaunchExample }: LandingS
                     className={`flex-1 py-1 rounded-md text-center transition-all cursor-pointer font-medium ${
                       activeTone === tone 
                         ? "bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 font-semibold shadow-sm border border-slate-200 dark:border-slate-800/80" 
-                        : "text-slate-450 hover:text-slate-900 dark:hover:text-slate-200"
+                        : "text-slate-550 hover:text-slate-900 dark:hover:text-slate-200"
                     }`}
                   >
                     {tone}
@@ -205,7 +205,7 @@ export function LandingScreen({ theme, onLaunchScan, onLaunchExample }: LandingS
               className={`p-3 rounded-xl border text-left flex items-center gap-3 transition-colors ${
                 theme === "dark" 
                   ? "bg-slate-950/25 border-slate-900 text-slate-300" 
-                  : "bg-slate-50 border-slate-150 text-slate-700 shadow-3xs"
+                  : "bg-slate-50 border-slate-200 text-slate-700 shadow-3xs"
               }`}
             >
               <div className="p-1 shrink-0 bg-slate-500/5 dark:bg-slate-400/5 rounded-lg border border-slate-200/10 dark:border-slate-800">
@@ -301,7 +301,7 @@ export function LandingScreen({ theme, onLaunchScan, onLaunchExample }: LandingS
             <div 
               key={idx}
               className={`p-5 rounded-xl border space-y-2 text-left ${
-                theme === "dark" ? "bg-slate-900/20 border-slate-850" : "bg-slate-50/50 border-slate-150 shadow-3xs"
+                theme === "dark" ? "bg-slate-900/20 border-slate-850" : "bg-slate-50/50 border-slate-200 shadow-3xs"
               }`}
             >
               <div className="flex items-center gap-2">

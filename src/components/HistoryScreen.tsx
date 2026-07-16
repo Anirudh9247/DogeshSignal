@@ -13,7 +13,7 @@ import {
   HelpCircle,
   FolderOpen
 } from "lucide-react";
-import { AnalysisResult } from "../types";
+import { AnalysisResult } from "../types/analysis";
 
 interface HistoryScreenProps {
   theme: "light" | "dark";
@@ -207,7 +207,7 @@ export function HistoryScreen({
                   <span className="text-[10px] font-mono font-extrabold text-orange-500">{averageRisk}% avg risk</span>
                 </div>
                 
-                <div className="h-24 w-full bg-slate-950/20 dark:bg-slate-955/40 rounded-xl p-2.5 border border-slate-150/40 dark:border-slate-900/60 relative flex items-center justify-center">
+                <div className="h-24 w-full bg-slate-950/20 dark:bg-slate-955/40 rounded-xl p-2.5 border border-slate-200/40 dark:border-slate-900/60 relative flex items-center justify-center">
                   {history.length > 0 ? (
                     (() => {
                       const chronologicalHistory = [...history].reverse();
@@ -355,8 +355,8 @@ export function HistoryScreen({
                         {scan.contextDetected}
                       </span>
                       {scan.timestamp && (
-                        <div className="flex items-center gap-1 text-[9.5px] text-slate-450 font-mono">
-                          <Clock className="w-3 h-3 text-slate-450" />
+                        <div className="flex items-center gap-1 text-[9.5px] text-slate-500 font-mono">
+                          <Clock className="w-3 h-3 text-slate-500" />
                           <span>{scan.timestamp}</span>
                         </div>
                       )}

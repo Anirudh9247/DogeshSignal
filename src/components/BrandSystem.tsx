@@ -3,141 +3,31 @@ import { motion, AnimatePresence } from "motion/react";
 import { HelpCircle, Copy, Check, Grid, Palette, Shield } from "lucide-react";
 
 /**
- * 1. MINIMAL GEOMETRIC INSTINCT LOGO
- * A highly polished abstract monoline mark combining alert points 
- * (representing natural intuition and active listening) with gentle 
- * concentric signal curves representing calm awareness.
+ * 1. BRAND LOGO
+ * The official Dogesh Signal shield logo — an orange shield with a
+ * stylised D·S monogram and signal arcs representing active sensing.
  */
 export function DogeshLogo({ className = "w-8 h-8", animate = true }) {
   return (
-    <div className={`relative ${className} flex items-center justify-center shrink-0`} id="brand_dogesh_logo">
-      <svg
-        viewBox="0 0 100 100"
-        fill="none"
-        xmlns="http://www.w3.org/2000/svg"
-        className="w-full h-full text-slate-800 dark:text-slate-100 transition-colors duration-300"
-      >
-        <style>
-          {`
-            @keyframes wifi-wave-1 {
-              0%, 100% { opacity: 0.3; stroke-width: 2.5px; }
-              33% { opacity: 1; stroke-width: 3.5px; filter: drop-shadow(0 0 2px rgba(249,115,22,0.4)); }
-              66% { opacity: 0.3; stroke-width: 2.5px; }
-            }
-            @keyframes wifi-wave-2 {
-              0%, 100% { opacity: 0.3; stroke-width: 2.5px; }
-              33% { opacity: 0.3; stroke-width: 2.5px; }
-              66% { opacity: 1; stroke-width: 3.5px; filter: drop-shadow(0 0 3px rgba(249,115,22,0.5)); }
-            }
-            @keyframes wifi-wave-3 {
-              0%, 100% { opacity: 0.3; stroke-width: 2.5px; }
-              10% { opacity: 0.3; stroke-width: 2.5px; }
-              80% { opacity: 1; stroke-width: 3.5px; filter: drop-shadow(0 0 4px rgba(249,115,22,0.6)); }
-            }
-            @keyframes alert-spark {
-              0%, 100% { transform: scale(1); opacity: 0.95; }
-              50% { transform: scale(1.18); opacity: 1; filter: drop-shadow(0 0 6px rgb(249,115,22)); }
-            }
-            .wave-inner {
-              animation: wifi-wave-1 2.4s infinite ease-in-out;
-            }
-            .wave-middle {
-              animation: wifi-wave-2 2.4s infinite ease-in-out;
-            }
-            .wave-outer {
-              animation: wifi-wave-3 2.4s infinite ease-in-out;
-            }
-            .spark-glow {
-              animation: alert-spark 1.8s infinite ease-in-out;
-              transform-origin: 50px 78px;
-            }
-          `}
-        </style>
-
-        {/* Outer subtle decorative support compass circle */}
-        <circle
-          cx="50"
-          cy="50"
-          r="46"
-          className="stroke-slate-200/50 dark:stroke-slate-800/25"
-          strokeWidth="1"
-          strokeDasharray="2 4"
-        />
-
-        {/* 1. Base Instinct Spark: The nose / glowing feedback center node */}
-        <circle
-          cx="50"
-          cy="78"
-          r="4.5"
-          className={`fill-orange-500 shadow-lg ${animate ? 'spark-glow' : ''}`}
-        />
-        <circle
-          cx="50"
-          cy="78"
-          r="9"
-          className="stroke-orange-500/25"
-          strokeWidth="1"
-        />
-
-        {/* 2. Premium Sleek Dog Head Outline (Symmetrical ears & jaw silhouette) */}
-        {/* Left Jaw & Cheek Curve */}
-        <path
-          d="M 36 72 C 34 76, 42 84, 50 84"
-          className="stroke-slate-700 dark:stroke-slate-200"
-          strokeWidth="2.8"
-          strokeLinecap="round"
-        />
-        {/* Right Jaw & Cheek Curve */}
-        <path
-          d="M 64 72 C 66 76, 58 84, 50 84"
-          className="stroke-slate-700 dark:stroke-slate-200"
-          strokeWidth="2.8"
-          strokeLinecap="round"
-        />
-
-        {/* Left Symmetrical Ear (Pointed, alert, transitioning into waves) */}
-        <path
-          d="M 36 72 L 26 48 L 44 58"
-          className="stroke-slate-700 dark:stroke-slate-200"
-          strokeWidth="2.8"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-        />
-
-        {/* Right Symmetrical Ear (Pointed, alert, transitioning into waves) */}
-        <path
-          d="M 64 72 L 74 48 L 56 58"
-          className="stroke-slate-700 dark:stroke-slate-200"
-          strokeWidth="2.8"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-        />
-
-        {/* 3. The 6th Sense Wi-Fi Signal Arcs emanating directly from the Dog's Mind */}
-        {/* Wi-Fi Wave Arc 1 (Inner Arc) */}
-        <path
-          d="M 33 42 A 22 22 0 0 1 67 42"
-          className={`stroke-orange-500 dark:stroke-orange-400 ${animate ? 'wave-inner' : ''}`}
-          strokeWidth="3"
-          strokeLinecap="round"
-        />
-
-        {/* Wi-Fi Wave Arc 2 (Middle Arc) */}
-        <path
-          d="M 22 29 A 36 36 0 0 1 78 29"
-          className={`stroke-slate-400 dark:stroke-slate-500 ${animate ? 'wave-middle' : ''}`}
-          strokeWidth="3"
-          strokeLinecap="round"
-        />
-
-        {/* Wi-Fi Wave Arc 3 (Outer Arc) */}
-        <path
-          d="M 12 16 A 50 50 0 0 1 88 16"
-          className={`stroke-orange-450 dark:stroke-orange-500 ${animate ? 'wave-outer' : ''}`}
-          strokeWidth="3"
-          strokeLinecap="round"
-        />
-      </svg>
+    <div
+      className={`relative ${className} flex items-center justify-center shrink-0`}
+      id="brand_dogesh_logo"
+      style={animate ? {
+        animation: "logo-pulse 2.4s ease-in-out infinite",
+      } : undefined}
+    >
+      <style>{`
+        @keyframes logo-pulse {
+          0%, 100% { filter: drop-shadow(0 0 4px #f9731640); }
+          50%       { filter: drop-shadow(0 0 10px #f9731680); }
+        }
+      `}</style>
+      <img
+        src="/logo.png"
+        alt="Dogesh Signal logo"
+        className="w-full h-full object-contain"
+        draggable={false}
+      />
     </div>
   );
 }
@@ -262,15 +152,15 @@ export function AppIconConceptShowcase() {
   return (
     <div className="border border-slate-200 dark:border-slate-900 rounded-2xl bg-white dark:bg-slate-950 p-6 relative overflow-hidden text-left" id="brand_system_panel">
       {/* Title block */}
-      <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-4 border-b border-slate-150 dark:border-slate-900 pb-5 mb-5 shrink-0">
+      <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-4 border-b border-slate-200 dark:border-slate-900 pb-5 mb-5 shrink-0">
         <div>
           <span className="text-[10px] font-bold tracking-wider text-slate-400 uppercase font-sans">
             Brand Framework
           </span>
-          <h3 className="text-sm font-bold font-sans text-slate-905 dark:text-slate-100 mt-0.5">
+          <h3 className="text-sm font-bold font-sans text-slate-900 dark:text-slate-100 mt-0.5">
             Design Philosophy & Vector Guidelines
           </h3>
-          <p className="text-xs text-slate-500 dark:text-slate-450 mt-0.5">
+          <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
             A secure aesthetic system centered on balance, confidence, and clear communication.
           </p>
         </div>
@@ -306,7 +196,7 @@ export function AppIconConceptShowcase() {
 
       <div className="grid grid-cols-1 md:grid-cols-12 gap-6 items-center">
         {/* LEFT COLUMN: BRAND SYMBOL PREVIEW */}
-        <div className="col-span-1 md:col-span-5 flex flex-col items-center justify-center p-6 border border-slate-150 dark:border-slate-900 bg-slate-50/50 dark:bg-slate-950/20 rounded-xl min-h-[180px] relative">
+        <div className="col-span-1 md:col-span-5 flex flex-col items-center justify-center p-6 border border-slate-200 dark:border-slate-900 bg-slate-50/50 dark:bg-slate-950/20 rounded-xl min-h-[180px] relative">
           <div className="w-24 h-24 bg-white dark:bg-slate-900 border border-slate-200/60 dark:border-slate-800 rounded-2xl shadow-sm relative flex items-center justify-center p-3">
             <DogeshLogo animate={false} className="w-16 h-16" />
           </div>
@@ -330,7 +220,7 @@ export function AppIconConceptShowcase() {
                 <p className="text-slate-600 dark:text-slate-400 leading-relaxed font-sans">
                   The Dogesh Signal crest relies on geometric purity. Symmetric intuition points express alert awareness and natural boundaries, while nested circular lines emphasize calm space and active focus.
                 </p>
-                <div className="p-3 bg-slate-50 dark:bg-slate-900/40 rounded-xl border border-slate-150 dark:border-slate-900 text-slate-500 font-sans">
+                <div className="p-3 bg-slate-50 dark:bg-slate-900/40 rounded-xl border border-slate-200 dark:border-slate-900 text-slate-500 font-sans">
                   Avoid literal canine illustrations, eyes, or gamer neon highlights. The product is elegant and strictly supportive.
                 </div>
               </motion.div>
