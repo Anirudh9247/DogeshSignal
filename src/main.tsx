@@ -39,30 +39,23 @@ if (typeof window !== "undefined") {
   try {
     const OriginalWebSocket = window.WebSocket;
     if (OriginalWebSocket) {
-      const SafeWebSocket = function(this: any, url: string | URL, protocols?: string | string[]) {
-        try {
-          const instance = new OriginalWebSocket(url, protocols);
-          // Intercept instance error event handling to prevent unhandled bubblings
-          instance.addEventListener("error", (e) => {
-            e.preventDefault?.();
-            e.stopPropagation?.();
-          }, { capture: true });
-          return instance;
-        } catch (err) {
-          console.warn("Caught secure WebSocket connection error gracefully:", err);
-          return {};
+      const SafeWebSocket = new Proxy(OriginalWebSocket, {
+        construct(target, args) {
+          try {
+            const instance = Reflect.construct(target, args);
+            // Intercept instance error event handling to prevent unhandled bubblings
+            instance.addEventListener("error", (e: any) => {
+              e.preventDefault?.();
+              e.stopPropagation?.();
+            }, { capture: true });
+            return instance;
+          } catch (err) {
+            console.warn("Caught secure WebSocket connection error gracefully:", err);
+            return {};
+          }
         }
-      };
-      // Ensure standard prototype features exist
-      SafeWebSocket.prototype = OriginalWebSocket.prototype;
-      // Assign standard static keys
-      Object.keys(OriginalWebSocket).forEach((key) => {
-        try {
-          (SafeWebSocket as any)[key] = (OriginalWebSocket as any)[key];
-        } catch (_) {}
       });
-      
-      // Attempt safe object definition to bypass getter-only properties, catching errors silently if disallowed
+
       try {
         Object.defineProperty(window, "WebSocket", {
           value: SafeWebSocket,
