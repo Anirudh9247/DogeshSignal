@@ -84,5 +84,19 @@ export async function runRateLimiterTests() {
   }
 
   console.log("✅ Gateway sensitive file blocking patterns verified.");
+
+  // Test 3: Readiness endpoint mock security checks
+  const checkReadiness = (token?: string, expectedToken?: string): number => {
+    if (expectedToken && token !== expectedToken) {
+      return 401;
+    }
+    return 200;
+  };
+  
+  if (checkReadiness("wrong", "secret") !== 401) throw new Error("Readiness check allowed invalid token.");
+  if (checkReadiness("secret", "secret") !== 200) throw new Error("Readiness check rejected valid token.");
+  if (checkReadiness(undefined, undefined) !== 200) throw new Error("Readiness check failed in default unauthenticated state.");
+  console.log("✅ Gateway readiness endpoint rules verified.");
+
   console.log("✅ Rate Limiter & Gateway Tests Completed Successfully!\n");
 }

@@ -101,6 +101,41 @@ app.get("/health", (_req, res) => {
   res.json({ status: "healthy" });
 });
 
+// Internal admin/deployment readiness probe to verify DB connection & tables
+app.get("/api/internal/readiness", async (req, res) => {
+  const token = req.query.token || req.headers["x-readiness-token"];
+  const expectedToken = process.env.READINESS_TOKEN;
+
+  if (expectedToken && token !== expectedToken) {
+    return res.status(401).json({ error: "Unauthorized readiness check" });
+  }
+
+  try {
+    const targetTables = ["profiles", "analysis_history", "usage", "credit_packs", "credit_transactions", "payments"];
+    const results: Record<string, boolean> = {};
+
+    if (isSupabaseConfiguredBackend()) {
+      for (const t of targetTables) {
+        const { error } = await supabaseAdmin.from(t).select("id").limit(1);
+        results[t] = !error || error.code === "PGRST116";
+      }
+    } else {
+      for (const t of targetTables) {
+        results[t] = true;
+      }
+    }
+
+    const allHealthy = Object.values(results).every(v => v);
+    return res.status(allHealthy ? 200 : 500).json({
+      status: allHealthy ? "healthy" : "unhealthy",
+      timestamp: new Date().toISOString(),
+      database: results
+    });
+  } catch (err: any) {
+    return res.status(500).json({ status: "unhealthy", error: err.message });
+  }
+});
+
 // ── Server startup ────────────────────────────────────────────────────────────
 async function startServer() {
   const PORT = Number(process.env.PORT) || 3000;

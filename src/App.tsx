@@ -24,6 +24,7 @@ import { login as loginApi, register as registerApi } from "./services/authServi
 import { useScan } from "./hooks/useScan";
 import { useHistory } from "./hooks/useHistory";
 import { importLocalHistoryToCloud } from "./services/history/history.service";
+import { trackEvent } from "./utils/analytics";
 import { localHistoryRepository } from "./services/history/history.repository";
 import { PlanType, UserProfile, getMockUser, isLoggedIn, PLAN_ENTITLEMENTS } from "./plans/subscription";
 import { usageService } from "./services/usageService";
@@ -244,6 +245,40 @@ function DashboardView() {
   const [usageCount, setUsageCount] = useState(0);
   const [showImportPrompt, setShowImportPrompt] = useState(false);
 
+  const handleGoToUpgradeFromLimit = () => {
+    if (messageText.trim()) {
+      localStorage.setItem("dogesh_pending_scan_upgrade", messageText);
+    }
+    trackEvent("Upgrade CTA Clicked", { currentPlan: user?.plan || "sniff" });
+    handleTabChange("settings");
+  };
+
+  const handleGoToLogin = () => {
+    handleTabChange("landing");
+    setTimeout(() => {
+      const el = document.getElementById("login_btn_nav");
+      if (el) el.click();
+    }, 150);
+  };
+
+  // Auto-resume scan after successful upgrade
+  useEffect(() => {
+    if (!user || user.plan === PlanType.SNIFF) return;
+
+    const pendingText = localStorage.getItem("dogesh_pending_scan_upgrade");
+    if (pendingText) {
+      localStorage.removeItem("dogesh_pending_scan_upgrade");
+      
+      // Navigate to workspace and auto-trigger scan
+      setActiveTab("workspace");
+      setMessageText(pendingText);
+      
+      setTimeout(() => {
+        handleTriggerScan(pendingText);
+      }, 500);
+    }
+  }, [user?.plan]);
+
 
 
   // Notification Queue
@@ -383,6 +418,7 @@ function DashboardView() {
     const finalText = (forcedText || messageText).trim();
     if (!finalText) {
       setError("Please paste a message or thread to start scanning.");
+      setErrorType("GENERIC");
       return;
     }
 
@@ -391,6 +427,8 @@ function DashboardView() {
     const canScan = await usageService.checkDailyLimit(email, activePlan);
     if (!canScan) {
       setError(`Daily limit reached for ${activePlan.toUpperCase()} plan. Upgrade or try again tomorrow!`);
+      setErrorType("LIMIT");
+      trackEvent("Limit Reached", { plan: activePlan, email });
       
       const limitNotif: SystemNotification = {
         id: "notif-limit-exceeded-" + Date.now(),
@@ -673,10 +711,12 @@ function DashboardView() {
                   isAnalyzing={isAnalyzing}
                   activeDogLog={activeDogLog}
                   error={error}
+                  errorType={errorType}
                   samples={SAMPLES}
                   onTriggerScan={() => handleTriggerScan()}
                   onSelectSample={handleLaunchExampleScan}
-                  onGoToSettings={() => handleTabChange("settings")}
+                  onGoToSettings={handleGoToUpgradeFromLimit}
+                  onGoToLogin={handleGoToLogin}
                 />
               )}
             </motion.div>

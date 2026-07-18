@@ -3,12 +3,15 @@ import { AnalysisResult } from "../types/analysis";
 import { useAuth } from "../context/AuthContext";
 import { clientFetch } from "../utils/clientFetch";
 
+export type ScanErrorType = "LIMIT" | "SERVER" | "AI_UNAVAILABLE" | "AUTH" | "GENERIC" | null;
+
 export function useScan() {
   const { token } = useAuth();
   const [messageText, setMessageText] = useState("");
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [result, setResult] = useState<AnalysisResult | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [errorType, setErrorType] = useState<ScanErrorType>(null);
   const [activeDogLog, setActiveDogLog] = useState("Ready to analyze a message.");
 
   const loadingMessages = [
@@ -20,25 +23,26 @@ export function useScan() {
     "Drafting respectful & firm boundary replies..."
   ];
 
-  const triggerScan = async (text: string) => {
-    const finalText = text.trim();
+  const triggerScan = async (forcedText?: string) => {
+    const finalText = (forcedText || messageText).trim();
     if (!finalText) {
       setError("Please paste a message or thread to start scanning.");
       return null;
     }
 
     setIsAnalyzing(true);
-    setResult(null);
     setError(null);
+    setErrorType(null);
+    setResult(null);
     setActiveDogLog(loadingMessages[0]);
 
-    let msgIndex = 0;
+    let msgIndex = 1;
     const interval = setInterval(() => {
-      msgIndex++;
       if (msgIndex < loadingMessages.length) {
         setActiveDogLog(loadingMessages[msgIndex]);
+        msgIndex++;
       }
-    }, 900);
+    }, 2500);
 
     try {
       const response = await clientFetch("/api/analyze", {
@@ -52,7 +56,23 @@ export function useScan() {
 
       if (!response.ok) {
         const errData = await response.json().catch(() => ({}));
-        throw new Error(errData.error || `Analyze API failed with status ${response.status}`);
+        const status = response.status;
+        let type: ScanErrorType = "GENERIC";
+
+        if (status === 429 || status === 403) {
+          type = "LIMIT";
+        } else if (status === 401) {
+          type = "AUTH";
+        } else if (status === 503 || status === 502 || status === 504) {
+          type = "AI_UNAVAILABLE";
+        } else if (status === 500) {
+          type = "SERVER";
+        }
+
+        const msg = errData.error || `Analyze API failed with status ${status}`;
+        setError(msg);
+        setErrorType(type);
+        throw { message: msg, type, status };
       }
 
       const data: AnalysisResult = await response.json();
@@ -72,9 +92,11 @@ export function useScan() {
       return completeResult;
     } catch (err: any) {
       console.error(err);
-      const msg = err?.message || "There was a routing problem with the AI vetting api. Please try again.";
+      const msg = err?.message || "There was a connection issue with the AI vetting gateway. Please try again.";
+      const type = err?.type || "GENERIC";
       setError(msg);
-      throw new Error(msg);
+      setErrorType(type);
+      throw err;
     } finally {
       clearInterval(interval);
       setIsAnalyzing(false);
@@ -89,6 +111,8 @@ export function useScan() {
     setResult,
     error,
     setError,
+    errorType,
+    setErrorType,
     activeDogLog,
     setActiveDogLog,
     triggerScan

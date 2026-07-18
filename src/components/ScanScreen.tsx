@@ -14,6 +14,7 @@ import {
   BadgeAlert
 } from "lucide-react";
 import { SensingMascot, SignalPulseWave } from "./BrandSystem";
+import { ScanErrorType } from "../hooks/useScan";
 
 interface SampleItem {
   title: string;
@@ -31,10 +32,12 @@ interface ScanScreenProps {
   isAnalyzing: boolean;
   activeDogLog: string;
   error: string | null;
+  errorType?: ScanErrorType;
   samples: SampleItem[];
   onTriggerScan: () => void;
   onSelectSample: (text: string) => void;
   onGoToSettings?: () => void;
+  onGoToLogin?: () => void;
 }
 
 const WHAT_DOGESH_LOOKS_FOR = [
@@ -317,12 +320,28 @@ export function ScanScreen({
                     <AlertTriangle className="w-4 h-4 shrink-0" />
                     <span>{error}</span>
                   </div>
-                  {(error.toLowerCase().includes("limit") || error.toLowerCase().includes("quota") || error.toLowerCase().includes("credits")) && onGoToSettings && (
+                  {errorType === "LIMIT" && onGoToSettings && (
                     <button
                       onClick={onGoToSettings}
-                      className="px-2.5 py-1 bg-rose-500 hover:bg-rose-600 text-white rounded text-[10px] font-bold uppercase cursor-pointer border-none text-center self-start sm:self-auto shrink-0 transition-colors"
+                      className="px-2.5 py-1 bg-orange-500 hover:bg-orange-600 text-slate-950 rounded text-[10px] font-bold uppercase cursor-pointer border-none text-center self-start sm:self-auto shrink-0 transition-colors"
                     >
                       Upgrade
+                    </button>
+                  )}
+                  {errorType === "AUTH" && onGoToLogin && (
+                    <button
+                      onClick={onGoToLogin}
+                      className="px-2.5 py-1 bg-indigo-650 hover:bg-indigo-700 text-white rounded text-[10px] font-bold uppercase cursor-pointer border-none text-center self-start sm:self-auto shrink-0 transition-colors"
+                    >
+                      Login
+                    </button>
+                  )}
+                  {(errorType === "AI_UNAVAILABLE" || errorType === "SERVER") && (
+                    <button
+                      onClick={onTriggerScan}
+                      className="px-2.5 py-1 bg-emerald-600 hover:bg-emerald-700 text-white rounded text-[10px] font-bold uppercase cursor-pointer border-none text-center self-start sm:self-auto shrink-0 transition-colors"
+                    >
+                      Try Again
                     </button>
                   )}
                 </div>

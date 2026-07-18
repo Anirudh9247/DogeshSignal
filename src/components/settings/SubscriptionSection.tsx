@@ -2,6 +2,7 @@ import React, { useState, useRef } from "react";
 import { CreditCard, LogOut, ShieldCheck, Zap, AlertCircle } from "lucide-react";
 import { PlanType, UserProfile, PLAN_ENTITLEMENTS } from "../../plans/subscription";
 import toast from "react-hot-toast";
+import { trackEvent } from "../../utils/analytics";
 import { useAuth } from "../../context/AuthContext";
 
 interface SubscriptionSectionProps {
@@ -152,6 +153,7 @@ export function SubscriptionSection({
         modal: {
           ondismiss: () => {
             toast("Payment cancelled.", { icon: "ℹ️" });
+            trackEvent("Upgrade Cancelled", { plan: targetPlan, flow: "order" });
             setIsProcessing(false);
             isOpenRef.current = false;
           }
@@ -177,12 +179,14 @@ export function SubscriptionSection({
             // 409 Conflict = already verified (idempotent success)
             if (verifyData.success) {
               toast.success(`🎉 ${tier.charAt(0).toUpperCase() + tier.slice(1)} plan activated!`);
+              trackEvent("Payment Completed", { plan: targetPlan, flow: "order" });
               onUpgradePlan(targetPlan);
             } else {
               throw new Error("Verification returned failure.");
             }
           } catch (verifyErr: any) {
             const status = (verifyErr as any)?.status;
+            trackEvent("Upgrade Failed", { plan: targetPlan, error: verifyErr?.message || "Verification failed", flow: "order" });
             if (status === 422) {
               setPaymentError("Payment signature invalid. Please contact support with your payment ID.");
             } else if (status === 403) {
@@ -208,15 +212,18 @@ export function SubscriptionSection({
         const desc = failureResponse?.error?.description || "Payment failed.";
         const code = failureResponse?.error?.code || "";
         toast.error(`Payment failed: ${desc}`);
+        trackEvent("Upgrade Failed", { plan: targetPlan, desc, flow: "order" });
         setPaymentError(`Payment failed${code ? ` (${code})` : ""}: ${desc}`);
         setIsProcessing(false);
         isOpenRef.current = false;
       });
 
+      trackEvent("Payment Started", { plan: targetPlan, flow: "order" });
       rzp.open();
     } catch (err: any) {
       console.error("Checkout error:", err);
       const msg = err?.message || "Failed to open payment checkout.";
+      trackEvent("Upgrade Failed", { plan: targetPlan, error: msg, flow: "order" });
       setPaymentError(msg);
       toast.error(msg);
       setIsProcessing(false);
@@ -270,6 +277,7 @@ export function SubscriptionSection({
         modal: {
           ondismiss: () => {
             toast("Payment cancelled.", { icon: "ℹ️" });
+            trackEvent("Upgrade Cancelled", { plan: targetPlan, flow: "subscription" });
             setIsProcessing(false);
             isOpenRef.current = false;
           }
@@ -288,10 +296,12 @@ export function SubscriptionSection({
             );
             if (verifyData.success) {
               toast.success(`🎉 ${targetPlan.toUpperCase()} subscription activated!`);
+              trackEvent("Payment Completed", { plan: targetPlan, flow: "subscription" });
               onUpgradePlan(targetPlan);
             }
           } catch (verifyErr: any) {
             setPaymentError(verifyErr?.message || "Subscription verification failed.");
+            trackEvent("Upgrade Failed", { plan: targetPlan, error: verifyErr?.message || "Verification failed", flow: "subscription" });
             toast.error("Subscription verification failed.");
           } finally {
             setIsProcessing(false);
@@ -304,6 +314,7 @@ export function SubscriptionSection({
       rzp.on("payment.failed", (fr: any) => {
         const desc = fr?.error?.description || "Payment failed.";
         toast.error(`Payment failed: ${desc}`);
+        trackEvent("Upgrade Failed", { plan: targetPlan, desc, flow: "subscription" });
         setPaymentError(desc);
         setIsProcessing(false);
         isOpenRef.current = false;
