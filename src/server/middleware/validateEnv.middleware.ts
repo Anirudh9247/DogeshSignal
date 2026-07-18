@@ -8,9 +8,12 @@ export function validateEnvironment() {
     "VITE_SUPABASE_ANON_KEY"
   ];
   if (isProd) {
-    requiredVars.push("SUPABASE_SERVICE_ROLE_KEY", "RAZORPAY_KEY_ID", "RAZORPAY_KEY_SECRET");
+    requiredVars.push("RAZORPAY_KEY_ID", "RAZORPAY_KEY_SECRET");
   }
   const missing = requiredVars.filter(v => !process.env[v]);
+  if (isProd && !process.env.SUPABASE_SERVICE_ROLE_KEY && !process.env.SUPABASE_SERVICE_KEY) {
+    missing.push("SUPABASE_SERVICE_ROLE_KEY");
+  }
   if (missing.length > 0) {
     const msg = `[STARTUP ERROR] Missing required environment variables: ${missing.join(", ")}`;
     if (isProd) {
