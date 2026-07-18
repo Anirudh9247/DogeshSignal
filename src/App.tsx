@@ -197,8 +197,17 @@ function DashboardView() {
   const [textSize, setTextSize] = useState<"sm" | "md" | "lg">("md");
 
   const handleTabChange = (tabId: string) => {
+    const titles: Record<string, string> = {
+      landing: "Dogesh Signal - Professional Tone Vetting & Pressure Detection",
+      workspace: "Workspace | Dogesh Signal Analyzer",
+      settings: "Settings & Billing | Dogesh Signal",
+      history: "Scan History | Dogesh Signal",
+      notifications: "Alert Center | Dogesh Signal"
+    };
+
     if (tabId === "how-it-works") {
       setActiveTab("landing");
+      document.title = titles.landing;
       setTimeout(() => {
         const el = document.getElementById("how_it_works_section");
         if (el) {
@@ -207,6 +216,9 @@ function DashboardView() {
       }, 120);
     } else {
       setActiveTab(tabId);
+      if (titles[tabId]) {
+        document.title = titles[tabId];
+      }
     }
   };
 
