@@ -134,3 +134,62 @@ export async function register(data: any) {
 
   return handleSupabaseCall(supabaseRegister, mockRegister, "Registration operation failed");
 }
+
+export async function signInWithProvider(provider: "google" | "twitter" | "linkedin") {
+  const supabaseOAuth = async () => {
+    const redirectTo = `${window.location.origin}/dashboard`;
+    const { error } = await supabase.auth.signInWithOAuth({
+      provider,
+      options: {
+        redirectTo,
+        queryParams: provider === "google" ? {
+          access_type: "offline",
+          prompt: "consent",
+        } : undefined
+      },
+    });
+
+    if (error) {
+      throw new Error(error.message);
+    }
+
+    return {
+      data: {
+        token: "",
+        user: null as any
+      }
+    };
+  };
+
+  const mockOAuth = async () => {
+    // Simulate network delay
+    await new Promise((resolve) => setTimeout(resolve, 800));
+    
+    const mockUser = {
+      id: `usr-${provider}-${Date.now().toString().slice(-6)}`,
+      fullName: `Mock ${provider.charAt(0).toUpperCase() + provider.slice(1)} User`,
+      email: `mock.${provider}@example.com`,
+      plan: PlanType.SNIFF,
+      createdAt: new Date().toISOString()
+    };
+    
+    // Save to mock database in localStorage
+    const users = JSON.parse(localStorage.getItem("dogesh_registered_users") || "[]");
+    if (!users.some((u: any) => u.email === mockUser.email)) {
+      users.push({
+        ...mockUser,
+        password: "Password123!"
+      });
+      localStorage.setItem("dogesh_registered_users", JSON.stringify(users));
+    }
+    
+    return {
+      data: {
+        token: `mock-${provider}-token-${Math.random().toString(36).substring(2)}`,
+        user: mockUser
+      }
+    };
+  };
+
+  return handleSupabaseCall(supabaseOAuth, mockOAuth, `OAuth with ${provider} failed`);
+}

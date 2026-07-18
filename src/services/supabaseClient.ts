@@ -22,7 +22,26 @@ export async function handleSupabaseCall<T>(
   if (isSupabaseConfigured()) {
     try {
       return await supabaseCall();
-    } catch (err) {
+    } catch (err: any) {
+      // Propagate client-side auth / validation errors directly to the user
+      const isAuthError = err && (
+        err.status === 400 || 
+        err.status === 401 ||
+        err.status === 403 ||
+        err.status === 409 ||
+        err.status === 422 ||
+        err.name === "AuthError" ||
+        err.message?.toLowerCase().includes("credential") ||
+        err.message?.toLowerCase().includes("confirmed") ||
+        err.message?.toLowerCase().includes("not found") ||
+        err.message?.toLowerCase().includes("already exists") ||
+        err.message?.toLowerCase().includes("password")
+      );
+
+      if (isAuthError) {
+        throw err;
+      }
+
       const isProd = import.meta.env.PROD;
       if (isProd) {
         console.error(`[SUPABASE PROD ERROR] ${prodErrorMessage}:`, err);
