@@ -34,6 +34,7 @@ interface ScanScreenProps {
   samples: SampleItem[];
   onTriggerScan: () => void;
   onSelectSample: (text: string) => void;
+  onGoToSettings?: () => void;
 }
 
 const WHAT_DOGESH_LOOKS_FOR = [
@@ -311,9 +312,19 @@ export function ScanScreen({
 
               {/* Error indicator representation */}
               {error && (
-                <div className="p-3.5 bg-rose-500/10 border border-rose-500/20 text-rose-400 text-xs rounded-xl flex items-center gap-2.5 font-mono">
-                  <AlertTriangle className="w-4 h-4 shrink-0" />
-                  <span>{error}</span>
+                <div className="p-3.5 bg-rose-500/10 border border-rose-500/20 text-rose-400 text-xs rounded-xl flex flex-col sm:flex-row sm:items-center justify-between gap-3 font-mono">
+                  <div className="flex items-center gap-2.5">
+                    <AlertTriangle className="w-4 h-4 shrink-0" />
+                    <span>{error}</span>
+                  </div>
+                  {(error.toLowerCase().includes("limit") || error.toLowerCase().includes("quota") || error.toLowerCase().includes("credits")) && onGoToSettings && (
+                    <button
+                      onClick={onGoToSettings}
+                      className="px-2.5 py-1 bg-rose-500 hover:bg-rose-600 text-white rounded text-[10px] font-bold uppercase cursor-pointer border-none text-center self-start sm:self-auto shrink-0 transition-colors"
+                    >
+                      Upgrade
+                    </button>
+                  )}
                 </div>
               )}
 

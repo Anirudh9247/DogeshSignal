@@ -676,6 +676,7 @@ function DashboardView() {
                   samples={SAMPLES}
                   onTriggerScan={() => handleTriggerScan()}
                   onSelectSample={handleLaunchExampleScan}
+                  onGoToSettings={() => handleTabChange("settings")}
                 />
               )}
             </motion.div>
