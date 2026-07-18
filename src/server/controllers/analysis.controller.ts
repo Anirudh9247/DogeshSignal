@@ -6,6 +6,7 @@ import { PLAN_ENTITLEMENTS, PlanType } from "../../plans/subscription";
 import { logEvent } from "../utils/logger";
 
 let aiClient: GoogleGenAI | null = null;
+const guestUsage = new Map<string, { count: number; resetTime: number }>();
 function getAiClient(): GoogleGenAI {
   if (!aiClient) {
     const apiKey = process.env.GEMINI_API_KEY;
@@ -18,6 +19,17 @@ function getAiClient(): GoogleGenAI {
 }
 
 export async function analyzeMessage(req: AuthenticatedRequest, res: Response) {
+  const isGuest = req.user.id === "00000000-0000-0000-0000-000000000000";
+  const ip = req.ip || req.headers["x-forwarded-for"] || "unknown";
+  const clientIp = Array.isArray(ip) ? ip[0] : ip;
+
+  let isGuestIncremented = false;
+  let isUsageIncremented = false;
+  let isCreditDecremented = false;
+  let packIdToRefund: string | null = null;
+  let usageSource: "plan" | "credit" = "plan";
+  let targetPack: any = null;
+
   try {
     const { message, enableReplyForge, model } = req.body;
     if (!message || typeof message !== "string" || message.trim() === "") {
@@ -26,22 +38,28 @@ export async function analyzeMessage(req: AuthenticatedRequest, res: Response) {
 
     const modelName = model || process.env.GEMINI_MODEL || "gemini-3.5-flash";
 
-    let plan = "sniff";
-    let usageSource: "plan" | "credit" = "plan";
-    let targetPack: any = null;
-    let currentUsageRow: any = null;
-
-    if (isSupabaseConfiguredBackend() && req.user.id !== "00000000-0000-0000-0000-000000000000") {
-      const { data: usage } = await supabaseAdmin
-        .from("usage")
-        .select("analyses_today, last_reset")
-        .eq("user_id", req.user.id)
-        .single();
-      currentUsageRow = usage;
+    // ── Guest Limit Validation (IP-based tracking in-memory) ──────────────────────
+    if (isGuest) {
+      const now = Date.now();
+      const guestLimit = 5;
+      const windowMs = 24 * 60 * 60 * 1000;
+      
+      const record = guestUsage.get(clientIp);
+      if (!record || now > record.resetTime) {
+        guestUsage.set(clientIp, { count: 1, resetTime: now + windowMs });
+      } else {
+        if (record.count >= guestLimit) {
+          logEvent("WARN", "Guest daily limit exceeded", { ip: clientIp });
+          return res.status(429).json({ error: "Guest daily limit exceeded. Please sign up or log in to get more scans." });
+        }
+        record.count++;
+      }
+      isGuestIncremented = true;
     }
 
-    // Admin check and daily limit validation
-    if (!req.user.isAdmin && isSupabaseConfiguredBackend() && req.user.id !== "00000000-0000-0000-0000-000000000000") {
+    // ── Authenticated User Limit & Concurrency Handling ────────────────────────
+    let plan = "sniff";
+    if (!req.user.isAdmin && isSupabaseConfiguredBackend() && !isGuest) {
       const { data: profile } = await supabaseAdmin
         .from("profiles")
         .select("plan")
@@ -54,16 +72,69 @@ export async function analyzeMessage(req: AuthenticatedRequest, res: Response) {
       const limit = entitlements.limits["analysis.daily"];
 
       if (limit !== Infinity) {
+        // Optimistic reservation to avoid concurrent race conditions: increment counter first
+        const { error: rpcErr } = await supabaseAdmin.rpc("increment_daily_usage", { user_id_param: req.user.id });
+        
         let analysesToday = 0;
-        const today = new Date().toISOString().split("T")[0];
+        if (rpcErr && rpcErr.code === "42883") {
+          // Fallback if RPC is missing
+          const { data: usage } = await supabaseAdmin
+            .from("usage")
+            .select("analyses_today, last_reset")
+            .eq("user_id", req.user.id)
+            .single();
+          
+          const todayStr = new Date().toISOString().split("T")[0];
+          const currentCount = usage ? usage.analyses_today : 0;
+          const lastReset = usage ? new Date(usage.last_reset).toISOString().split("T")[0] : todayStr;
+          analysesToday = lastReset === todayStr ? currentCount + 1 : 1;
 
-        if (currentUsageRow) {
-          const dbResetDate = new Date(currentUsageRow.last_reset).toISOString().split("T")[0];
-          if (dbResetDate === today) analysesToday = currentUsageRow.analyses_today;
+          if (usage) {
+            await supabaseAdmin
+              .from("usage")
+              .update({ 
+                analyses_today: analysesToday,
+                last_reset: lastReset === todayStr ? usage.last_reset : new Date().toISOString()
+              })
+              .eq("user_id", req.user.id);
+          } else {
+            await supabaseAdmin
+              .from("usage")
+              .insert({
+                user_id: req.user.id,
+                analyses_today: 1,
+                last_reset: new Date().toISOString()
+              });
+          }
+        } else if (rpcErr) {
+          throw rpcErr;
+        } else {
+          const { data: usage } = await supabaseAdmin
+            .from("usage")
+            .select("analyses_today")
+            .eq("user_id", req.user.id)
+            .single();
+          analysesToday = usage?.analyses_today || 1;
         }
 
-        if (analysesToday >= limit) {
-          // Check active credit packs
+        isUsageIncremented = true;
+
+        if (analysesToday > limit) {
+          // If we exceeded daily limit, refund the usage increment and try using credit pack
+          isUsageIncremented = false;
+          const { data: currentUsage } = await supabaseAdmin
+            .from("usage")
+            .select("analyses_today")
+            .eq("user_id", req.user.id)
+            .single();
+          if (currentUsage && currentUsage.analyses_today > 0) {
+            await supabaseAdmin
+              .from("usage")
+              .update({ analyses_today: currentUsage.analyses_today - 1 })
+              .eq("user_id", req.user.id);
+          }
+
+          // Fetch and evaluate credit packs
           const { data: packs, error: fetchErr } = await supabaseAdmin
             .from("credit_packs")
             .select("*")
@@ -73,7 +144,6 @@ export async function analyzeMessage(req: AuthenticatedRequest, res: Response) {
           if (fetchErr) throw fetchErr;
 
           const now = new Date();
-          let totalValidCredits = 0;
           const validPacks = [];
 
           for (const pack of (packs || [])) {
@@ -90,23 +160,46 @@ export async function analyzeMessage(req: AuthenticatedRequest, res: Response) {
                 metadata: { description: "Credit pack expired", packId: pack.id }
               });
             } else {
-              totalValidCredits += pack.remaining_credits;
               validPacks.push(pack);
             }
           }
 
-          if (totalValidCredits <= 0) {
+          if (validPacks.length === 0) {
             return res.status(403).json({
               error: "Daily limit exceeded. Please upgrade your plan or purchase Signal Packs."
             });
           }
 
-          usageSource = "credit";
-          targetPack = validPacks.sort((a, b) => {
+          const sortedPacks = validPacks.sort((a, b) => {
             if (!a.expires_at) return 1;
             if (!b.expires_at) return -1;
             return new Date(a.expires_at).getTime() - new Date(b.expires_at).getTime();
-          })[0];
+          });
+
+          const packToUse = sortedPacks[0];
+
+          // Atomically decrement credit pack
+          const { error: rpcDecErr } = await supabaseAdmin.rpc("decrement_credit_pack", { pack_id_param: packToUse.id });
+          if (rpcDecErr && rpcDecErr.code === "42883") {
+            await supabaseAdmin
+              .from("credit_packs")
+              .update({ remaining_credits: packToUse.remaining_credits - 1 })
+              .eq("id", packToUse.id);
+          } else if (rpcDecErr) {
+            throw rpcDecErr;
+          }
+
+          await supabaseAdmin.from("credit_transactions").insert({
+            user_id: req.user.id,
+            amount: -1,
+            type: "USAGE",
+            metadata: { description: "Daily limit exceeded scan consumption", packId: packToUse.id }
+          });
+
+          isCreditDecremented = true;
+          packIdToRefund = packToUse.id;
+          usageSource = "credit";
+          targetPack = packToUse;
         }
       }
     }
@@ -443,67 +536,58 @@ ${message}
 
 
     const result = JSON.parse(response.text.trim());
-
-    // Update usage stats for non-admin profiles
-    if (isSupabaseConfiguredBackend() && req.user.id !== "00000000-0000-0000-0000-000000000000") {
-      try {
-        if (usageSource === "credit" && targetPack) {
-          const { error: rpcErr } = await supabaseAdmin.rpc("decrement_credit_pack", { pack_id_param: targetPack.id });
-          
-          if (rpcErr && rpcErr.code === "42883") {
-            await supabaseAdmin
-              .from("credit_packs")
-              .update({ remaining_credits: targetPack.remaining_credits - 1 })
-              .eq("id", targetPack.id);
-          } else if (rpcErr) {
-            throw rpcErr;
-          }
-
-          await supabaseAdmin.from("credit_transactions").insert({
-            user_id: req.user.id,
-            amount: -1,
-            type: "USAGE",
-            metadata: { description: "Daily limit exceeded scan consumption", packId: targetPack.id }
-          });
-        } else {
-          const { error: rpcErr } = await supabaseAdmin.rpc("increment_daily_usage", { user_id_param: req.user.id });
-          
-          if (rpcErr && rpcErr.code === "42883") {
-            const today = new Date().toISOString().split("T")[0];
-            const currentCount = currentUsageRow ? currentUsageRow.analyses_today : 0;
-            const lastReset = currentUsageRow ? new Date(currentUsageRow.last_reset).toISOString().split("T")[0] : today;
-
-            if (currentUsageRow) {
-              const nextCount = lastReset === today ? currentCount + 1 : 1;
-              await supabaseAdmin
-                .from("usage")
-                .update({ 
-                  analyses_today: nextCount,
-                  last_reset: lastReset === today ? currentUsageRow.last_reset : new Date().toISOString()
-                })
-                .eq("user_id", req.user.id);
-            } else {
-              await supabaseAdmin
-                .from("usage")
-                .insert({
-                  user_id: req.user.id,
-                  analyses_today: 1,
-                  last_reset: new Date().toISOString()
-                });
-            }
-          } else if (rpcErr) {
-            throw rpcErr;
-          }
-        }
-      } catch (dbErr: any) {
-        logEvent("WARN", "Server-side usage increment failed", { userId: req.user.id, error: dbErr.message });
-      }
-    }
-
     return res.json(result);
 
   } catch (error: any) {
     console.error("Vetting pipeline failed:", error);
+
+    // Rollback / Refund limits decrement on failure
+    if (isSupabaseConfiguredBackend() && !isGuest && req.user.id !== "00000000-0000-0000-0000-000000000000") {
+      try {
+        if (isUsageIncremented) {
+          const { data: usage } = await supabaseAdmin
+            .from("usage")
+            .select("analyses_today")
+            .eq("user_id", req.user.id)
+            .single();
+          if (usage && usage.analyses_today > 0) {
+            await supabaseAdmin
+              .from("usage")
+              .update({ analyses_today: usage.analyses_today - 1 })
+              .eq("user_id", req.user.id);
+          }
+        } else if (isCreditDecremented && packIdToRefund) {
+          const { data: pack } = await supabaseAdmin
+            .from("credit_packs")
+            .select("remaining_credits")
+            .eq("id", packIdToRefund)
+            .single();
+          if (pack) {
+            await supabaseAdmin
+              .from("credit_packs")
+              .update({ remaining_credits: pack.remaining_credits + 1 })
+              .eq("id", packIdToRefund);
+
+            await supabaseAdmin.from("credit_transactions").insert({
+              user_id: req.user.id,
+              amount: 1,
+              type: "REFUND",
+              metadata: { description: "Refund for failed scan", packId: packIdToRefund }
+            });
+          }
+        }
+      } catch (refundErr: any) {
+        logEvent("ERROR", "Usage refund failed after analysis exception", { userId: req.user.id, error: refundErr.message });
+      }
+    }
+
+    if (isGuest && isGuestIncremented) {
+      const record = guestUsage.get(clientIp);
+      if (record && record.count > 0) {
+        record.count--;
+      }
+    }
+
     res.status(500).json({
       error: "Vetting pipeline failed",
       details: error.message || String(error)
