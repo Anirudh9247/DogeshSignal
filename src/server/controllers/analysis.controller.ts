@@ -31,8 +31,17 @@ export async function analyzeMessage(req: AuthenticatedRequest, res: Response) {
     let targetPack: any = null;
     let currentUsageRow: any = null;
 
+    if (isSupabaseConfiguredBackend() && req.user.id !== "00000000-0000-0000-0000-000000000000") {
+      const { data: usage } = await supabaseAdmin
+        .from("usage")
+        .select("analyses_today, last_reset")
+        .eq("user_id", req.user.id)
+        .single();
+      currentUsageRow = usage;
+    }
+
     // Admin check and daily limit validation
-    if (!req.user.isAdmin && isSupabaseConfiguredBackend()) {
+    if (!req.user.isAdmin && isSupabaseConfiguredBackend() && req.user.id !== "00000000-0000-0000-0000-000000000000") {
       const { data: profile } = await supabaseAdmin
         .from("profiles")
         .select("plan")
@@ -47,17 +56,10 @@ export async function analyzeMessage(req: AuthenticatedRequest, res: Response) {
       if (limit !== Infinity) {
         let analysesToday = 0;
         const today = new Date().toISOString().split("T")[0];
-        const { data: usage } = await supabaseAdmin
-          .from("usage")
-          .select("analyses_today, last_reset")
-          .eq("user_id", req.user.id)
-          .single();
 
-        currentUsageRow = usage;
-
-        if (usage) {
-          const dbResetDate = new Date(usage.last_reset).toISOString().split("T")[0];
-          if (dbResetDate === today) analysesToday = usage.analyses_today;
+        if (currentUsageRow) {
+          const dbResetDate = new Date(currentUsageRow.last_reset).toISOString().split("T")[0];
+          if (dbResetDate === today) analysesToday = currentUsageRow.analyses_today;
         }
 
         if (analysesToday >= limit) {
@@ -254,173 +256,196 @@ Message to analyze:
 ${message}
 """`;
 
-    // Request structured JSON output from Gemini
-    const response = await ai.models.generateContent({
-      model: modelName,
-      contents: userPrompt,
-      config: {
-        systemInstruction,
-        responseMimeType: "application/json",
-        temperature: 0.1,
-        responseSchema: {
-          type: Type.OBJECT,
-          required: [
-            "heuristicRiskRating",
-            "transparencyProbability",
-            "calculationConfidence",
-            "contextDetected",
-            "strategicScanTarget",
-            "executiveSummary",
-            "microFeatures",
-            "microFeatureMaxes",
-            "significantTonalAnomalies",
-            "stylisticSubtextIndicators",
-            "suggestedBoundariesPlan",
-            "diligenceSafeguardsRecommended",
-            "uncertaintiesAndNuances",
-            "replyForgeStatus",
-            "replies"
-          ],
-          properties: {
-            heuristicRiskRating: {
-              type: Type.INTEGER,
-              description: "The calculated risk score normalized from 0 to 100."
-            },
-            transparencyProbability: {
-              type: Type.INTEGER,
-              description: "Estimated probability of genuine, transparent intent, from 0 to 100."
-            },
-            calculationConfidence: {
-              type: Type.STRING,
-              description: "Confidence scoring strength level: LOW, MEDIUM, or HIGH"
-            },
-            contextDetected: {
-              type: Type.STRING,
-              description: "Identified sender scenario, e.g. HR / Recruiter / Hiring Team, Freelance Client / Project Owner, Buyer / Seller / Marketplace Lead, etc."
-            },
-            strategicScanTarget: {
-              type: Type.STRING,
-              description: "Targeted receiver persona exactly, e.g., Worker / Freelancer / Vendor, Job Candidate, Tenant / Renter, Seller, Buyer, etc."
-            },
-            executiveSummary: {
-              type: Type.STRING,
-              description: "2-3 sentences explaining risk, safer/riskier elements, and who is targeted."
-            },
-            microFeatures: {
+    const modelsToTry = Array.from(new Set([
+      modelName,
+      "gemini-3.5-flash",
+      "gemini-3.1-flash-lite",
+      "gemini-3-flash-preview",
+      "gemini-3.1-pro-preview"
+    ])).filter(Boolean).filter(m => m.includes("-3"));
+
+    let response: any = null;
+    let lastError: any = null;
+
+    for (const currentModel of modelsToTry) {
+      try {
+        logEvent("INFO", `Attempting analyze message with model: ${currentModel}`);
+        response = await ai.models.generateContent({
+          model: currentModel,
+          contents: userPrompt,
+          config: {
+            systemInstruction,
+            responseMimeType: "application/json",
+            temperature: 0.1,
+            responseSchema: {
               type: Type.OBJECT,
-              properties: {
-                deferredPaymentRisk: { type: Type.INTEGER },
-                urgencyPressure: { type: Type.INTEGER },
-                guiltPressure: { type: Type.INTEGER },
-                sunkCostPressure: { type: Type.INTEGER },
-                futureOpportunityBait: { type: Type.INTEGER },
-                scopeCreepRisk: { type: Type.INTEGER },
-                dependencyPressure: { type: Type.INTEGER },
-                boundaryErosion: { type: Type.INTEGER },
-                manipulationIntensity: { type: Type.INTEGER },
-                transparencySignals: { type: Type.INTEGER }
-              },
               required: [
-                "deferredPaymentRisk",
-                "urgencyPressure",
-                "guiltPressure",
-                "sunkCostPressure",
-                "futureOpportunityBait",
-                "scopeCreepRisk",
-                "dependencyPressure",
-                "boundaryErosion",
-                "manipulationIntensity",
-                "transparencySignals"
-              ]
-            },
-            microFeatureMaxes: {
-              type: Type.OBJECT,
+                "heuristicRiskRating",
+                "transparencyProbability",
+                "calculationConfidence",
+                "contextDetected",
+                "strategicScanTarget",
+                "executiveSummary",
+                "microFeatures",
+                "microFeatureMaxes",
+                "significantTonalAnomalies",
+                "stylisticSubtextIndicators",
+                "suggestedBoundariesPlan",
+                "diligenceSafeguardsRecommended",
+                "uncertaintiesAndNuances",
+                "replyForgeStatus",
+                "replies"
+              ],
               properties: {
-                deferredPaymentRisk: { type: Type.INTEGER },
-                urgencyPressure: { type: Type.INTEGER },
-                guiltPressure: { type: Type.INTEGER },
-                sunkCostPressure: { type: Type.INTEGER },
-                futureOpportunityBait: { type: Type.INTEGER },
-                scopeCreepRisk: { type: Type.INTEGER },
-                dependencyPressure: { type: Type.INTEGER },
-                boundaryErosion: { type: Type.INTEGER },
-                manipulationIntensity: { type: Type.INTEGER },
-                transparencySignals: { type: Type.INTEGER }
-              },
-              required: [
-                "deferredPaymentRisk",
-                "urgencyPressure",
-                "guiltPressure",
-                "sunkCostPressure",
-                "futureOpportunityBait",
-                "scopeCreepRisk",
-                "dependencyPressure",
-                "boundaryErosion",
-                "manipulationIntensity",
-                "transparencySignals"
-              ]
-            },
-            significantTonalAnomalies: {
-              type: Type.ARRAY,
-              items: {
-                type: Type.OBJECT,
-                required: ["category", "severity", "rationale", "evidenceSnippet"],
-                properties: {
-                  category: { type: Type.STRING },
-                  severity: { type: Type.STRING },
-                  rationale: { type: Type.STRING },
-                  evidenceSnippet: { type: Type.STRING }
-				}
-              }
-            },
-            stylisticSubtextIndicators: {
-              type: Type.ARRAY,
-              items: {
-                type: Type.OBJECT,
-                required: ["hint", "whyItMatters"],
-                properties: {
-                  hint: { type: Type.STRING },
-                  whyItMatters: { type: Type.STRING }
+                heuristicRiskRating: {
+                  type: Type.INTEGER,
+                  description: "The calculated risk score normalized from 0 to 100."
+                },
+                transparencyProbability: {
+                  type: Type.INTEGER,
+                  description: "Estimated probability of genuine, transparent intent, from 0 to 100."
+                },
+                calculationConfidence: {
+                  type: Type.STRING,
+                  description: "Confidence scoring strength level: LOW, MEDIUM, or HIGH"
+                },
+                contextDetected: {
+                  type: Type.STRING,
+                  description: "Identified sender scenario, e.g. HR / Recruiter / Hiring Team, Freelance Client / Project Owner, Buyer / Seller / Marketplace Lead, etc."
+                },
+                strategicScanTarget: {
+                  type: Type.STRING,
+                  description: "Targeted receiver persona exactly, e.g., Worker / Freelancer / Vendor, Job Candidate, Tenant / Renter, Seller, Buyer, etc."
+                },
+                executiveSummary: {
+                  type: Type.STRING,
+                  description: "2-3 sentences explaining risk, safer/riskier elements, and who is targeted."
+                },
+                microFeatures: {
+                  type: Type.OBJECT,
+                  properties: {
+                    deferredPaymentRisk: { type: Type.INTEGER },
+                    urgencyPressure: { type: Type.INTEGER },
+                    guiltPressure: { type: Type.INTEGER },
+                    sunkCostPressure: { type: Type.INTEGER },
+                    futureOpportunityBait: { type: Type.INTEGER },
+                    scopeCreepRisk: { type: Type.INTEGER },
+                    dependencyPressure: { type: Type.INTEGER },
+                    boundaryErosion: { type: Type.INTEGER },
+                    manipulationIntensity: { type: Type.INTEGER },
+                    transparencySignals: { type: Type.INTEGER }
+                  },
+                  required: [
+                    "deferredPaymentRisk",
+                    "urgencyPressure",
+                    "guiltPressure",
+                    "sunkCostPressure",
+                    "futureOpportunityBait",
+                    "scopeCreepRisk",
+                    "dependencyPressure",
+                    "boundaryErosion",
+                    "manipulationIntensity",
+                    "transparencySignals"
+                  ]
+                },
+                microFeatureMaxes: {
+                  type: Type.OBJECT,
+                  properties: {
+                    deferredPaymentRisk: { type: Type.INTEGER },
+                    urgencyPressure: { type: Type.INTEGER },
+                    guiltPressure: { type: Type.INTEGER },
+                    sunkCostPressure: { type: Type.INTEGER },
+                    futureOpportunityBait: { type: Type.INTEGER },
+                    scopeCreepRisk: { type: Type.INTEGER },
+                    dependencyPressure: { type: Type.INTEGER },
+                    boundaryErosion: { type: Type.INTEGER },
+                    manipulationIntensity: { type: Type.INTEGER },
+                    transparencySignals: { type: Type.INTEGER }
+                  },
+                  required: [
+                    "deferredPaymentRisk",
+                    "urgencyPressure",
+                    "guiltPressure",
+                    "sunkCostPressure",
+                    "futureOpportunityBait",
+                    "scopeCreepRisk",
+                    "dependencyPressure",
+                    "boundaryErosion",
+                    "manipulationIntensity",
+                    "transparencySignals"
+                  ]
+                },
+                significantTonalAnomalies: {
+                  type: Type.ARRAY,
+                  items: {
+                    type: Type.OBJECT,
+                    required: ["category", "severity", "rationale", "evidenceSnippet"],
+                    properties: {
+                      category: { type: Type.STRING },
+                      severity: { type: Type.STRING },
+                      rationale: { type: Type.STRING },
+                      evidenceSnippet: { type: Type.STRING }
+                    }
+                  }
+                },
+                stylisticSubtextIndicators: {
+                  type: Type.ARRAY,
+                  items: {
+                    type: Type.OBJECT,
+                    required: ["hint", "whyItMatters"],
+                    properties: {
+                      hint: { type: Type.STRING },
+                      whyItMatters: { type: Type.STRING }
+                    }
+                  }
+                },
+                suggestedBoundariesPlan: {
+                  type: Type.ARRAY,
+                  items: { type: Type.STRING }
+                },
+                diligenceSafeguardsRecommended: {
+                  type: Type.STRING
+                },
+                uncertaintiesAndNuances: {
+                  type: Type.ARRAY,
+                  items: { type: Type.STRING }
+                },
+                replyForgeStatus: {
+                  type: Type.STRING,
+                  description: "Active if Reply Forge was turned on, otherwise Inactive"
+                },
+                replies: {
+                  type: Type.OBJECT,
+                  required: ["professional", "bold", "supportive"],
+                  properties: {
+                    professional: { type: Type.STRING },
+                    bold: { type: Type.STRING },
+                    supportive: { type: Type.STRING }
+                  }
                 }
-              }
-            },
-            suggestedBoundariesPlan: {
-              type: Type.ARRAY,
-              items: { type: Type.STRING }
-            },
-            diligenceSafeguardsRecommended: {
-              type: Type.STRING
-            },
-            uncertaintiesAndNuances: {
-              type: Type.ARRAY,
-              items: { type: Type.STRING }
-            },
-            replyForgeStatus: {
-              type: Type.STRING,
-              description: "Active if Reply Forge was turned on, otherwise Inactive"
-            },
-            replies: {
-              type: Type.OBJECT,
-              required: ["professional", "bold", "supportive"],
-              properties: {
-                professional: { type: Type.STRING },
-                bold: { type: Type.STRING },
-                supportive: { type: Type.STRING }
               }
             }
           }
+        });
+        if (response && response.text) {
+          logEvent("INFO", `Analyze message succeeded with model: ${currentModel}`);
+          break;
         }
+      } catch (err: any) {
+        logEvent("WARN", `Model ${currentModel} failed in analyzeMessage: ${err.message || err}`);
+        lastError = err;
       }
-    });
-
-    if (!response.text) {
-      throw new Error("No response text received from Gemini.");
     }
+
+    if (!response || !response.text) {
+      throw lastError || new Error("All Gemini models failed to generate content.");
+    }
+
 
     const result = JSON.parse(response.text.trim());
 
     // Update usage stats for non-admin profiles
-    if (!req.user.isAdmin && isSupabaseConfiguredBackend()) {
+    if (isSupabaseConfiguredBackend() && req.user.id !== "00000000-0000-0000-0000-000000000000") {
       try {
         if (usageSource === "credit" && targetPack) {
           const { error: rpcErr } = await supabaseAdmin.rpc("decrement_credit_pack", { pack_id_param: targetPack.id });
@@ -444,11 +469,28 @@ ${message}
           const { error: rpcErr } = await supabaseAdmin.rpc("increment_daily_usage", { user_id_param: req.user.id });
           
           if (rpcErr && rpcErr.code === "42883") {
+            const today = new Date().toISOString().split("T")[0];
             const currentCount = currentUsageRow ? currentUsageRow.analyses_today : 0;
-            await supabaseAdmin
-              .from("usage")
-              .update({ analyses_today: currentCount + 1 })
-              .eq("user_id", req.user.id);
+            const lastReset = currentUsageRow ? new Date(currentUsageRow.last_reset).toISOString().split("T")[0] : today;
+
+            if (currentUsageRow) {
+              const nextCount = lastReset === today ? currentCount + 1 : 1;
+              await supabaseAdmin
+                .from("usage")
+                .update({ 
+                  analyses_today: nextCount,
+                  last_reset: lastReset === today ? currentUsageRow.last_reset : new Date().toISOString()
+                })
+                .eq("user_id", req.user.id);
+            } else {
+              await supabaseAdmin
+                .from("usage")
+                .insert({
+                  user_id: req.user.id,
+                  analyses_today: 1,
+                  last_reset: new Date().toISOString()
+                });
+            }
           } else if (rpcErr) {
             throw rpcErr;
           }
@@ -468,3 +510,68 @@ ${message}
     });
   }
 }
+
+export async function translateText(req: AuthenticatedRequest, res: Response) {
+  try {
+    const { text, targetLanguage } = req.body;
+    if (!text || typeof text !== "string" || text.trim() === "") {
+      return res.status(400).json({ error: "Text is required and must be a string." });
+    }
+    if (!targetLanguage || typeof targetLanguage !== "string" || targetLanguage.trim() === "") {
+      return res.status(400).json({ error: "Target language is required and must be a string." });
+    }
+
+    const ai = getAiClient();
+    const systemInstruction = `You are a professional translator and tone-rephraser.
+Translate or rephrase the given text into: "${targetLanguage}".
+Keep the tone, format, and meaning (including any bullet points or newlines) identical.
+Return ONLY the translated/rephrased text. Do not include any introductory sentences, quotes, explanations, or markdown wrappers.`;
+
+    const modelName = process.env.GEMINI_MODEL || "gemini-3.5-flash";
+    const modelsToTry = Array.from(new Set([
+      modelName,
+      "gemini-3.5-flash",
+      "gemini-3.1-flash-lite",
+      "gemini-3-flash-preview",
+      "gemini-3.1-pro-preview"
+    ])).filter(Boolean).filter(m => m.includes("-3"));
+
+    let response: any = null;
+    let lastError: any = null;
+
+    for (const currentModel of modelsToTry) {
+      try {
+        logEvent("INFO", `Attempting translation with model: ${currentModel}`);
+        response = await ai.models.generateContent({
+          model: currentModel,
+          contents: text,
+          config: {
+            systemInstruction,
+            temperature: 0.2
+          }
+        });
+        if (response && response.text) {
+          logEvent("INFO", `Translation succeeded with model: ${currentModel}`);
+          break;
+        }
+      } catch (err: any) {
+        logEvent("WARN", `Model ${currentModel} failed in translateText: ${err.message || err}`);
+        lastError = err;
+      }
+    }
+
+    if (!response || !response.text) {
+      throw lastError || new Error("All Gemini models failed translation.");
+    }
+
+
+    return res.json({ translatedText: response.text.trim() });
+  } catch (error: any) {
+    console.error("Translation pipeline failed:", error);
+    return res.status(500).json({
+      error: "Translation failed",
+      details: error.message || String(error)
+    });
+  }
+}
+

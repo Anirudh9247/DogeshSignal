@@ -414,7 +414,7 @@ export function SubscriptionSection({
                     id="btn_upgrade_guard"
                     onClick={() => handleUpgrade("guard")}
                     disabled={isProcessing}
-                    className="flex-grow py-2 px-3 bg-slate-100 hover:bg-slate-200 dark:bg-slate-955 dark:hover:bg-slate-900 border border-slate-200 dark:border-slate-850 rounded-xl text-[10px] font-mono font-bold uppercase text-slate-700 dark:text-slate-200 flex items-center justify-center gap-1 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                    className="flex-grow py-2 px-3 bg-slate-100 hover:bg-slate-200 dark:bg-slate-900 dark:hover:bg-slate-800 border border-slate-200 dark:border-slate-850 rounded-xl text-[10px] font-mono font-bold uppercase text-slate-700 dark:text-slate-200 flex items-center justify-center gap-1 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
                   >
                     <Zap className="w-3.5 h-3.5 text-orange-500" />
                     <span>Guard ({PLAN_DISPLAY.guard[cycleKey]})</span>

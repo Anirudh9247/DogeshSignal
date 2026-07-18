@@ -1,4 +1,5 @@
 import { Request, Response, NextFunction } from "express";
+import { PlanType, PLAN_AMOUNTS } from "../../plans/subscription";
 
 /**
  * Server-authoritative plan price map (USD cents).
@@ -8,10 +9,10 @@ import { Request, Response, NextFunction } from "express";
  * To change pricing, update this map — no frontend changes required.
  */
 export const PLAN_PRICES_USD: Record<string, number> = {
-  guard_monthly:   499,      // $4.99/month
-  guard_annual:    4900,     // $49/year
-  shield_monthly:  1299,     // $12.99/month
-  shield_annual:   12900     // $129/year
+  [PlanType.GUARD_MONTHLY]: PLAN_AMOUNTS[PlanType.GUARD_MONTHLY],
+  [PlanType.GUARD_ANNUAL]:  PLAN_AMOUNTS[PlanType.GUARD_ANNUAL],
+  [PlanType.SHIELD_MONTHLY]: PLAN_AMOUNTS[PlanType.SHIELD_MONTHLY],
+  [PlanType.SHIELD_ANNUAL]:  PLAN_AMOUNTS[PlanType.SHIELD_ANNUAL]
 };
 
 /** Valid plan identifiers accepted from the frontend */
