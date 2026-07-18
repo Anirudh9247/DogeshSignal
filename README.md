@@ -32,11 +32,13 @@ An AI-powered communication coach and boundary assistant designed to help profes
 ## 🛠️ Tech Stack & Architecture
 
 ### Frontend
+
 * **Core**: React 19 + TypeScript + Vite.
 * **Styling**: Vanilla Tailwind CSS.
 * **Routing**: React Router DOM (v6).
 
 ### Backend
+
 * **Server**: Express Node.js application (hosted in `server.ts`).
 * **Database & Auth**: Supabase database schema & client authentication hooks.
 * **AI Engine**: Google GenAI SDK (`@google/genai`) targeting `gemini-3.5-flash` with dynamic model selection support.
@@ -47,43 +49,40 @@ An AI-powered communication coach and boundary assistant designed to help profes
 ## 🚦 Getting Started
 
 ### Prerequisites
+
 * **Node.js** (v18+)
 * **NPM** (v9+)
 
 ### Local Installation
+
 1. Clone the repository and install dependencies:
+
    ```bash
    npm install
    ```
+
 2. Create your local environment configuration file:
+
    ```bash
    cp .env.example .env
    ```
-3. Populate `.env` with your API keys and configuration parameters:
-   ```env
-   # Gemini API Key
-   GEMINI_API_KEY="AIzaSy..."
-
-   # Supabase Setup (Optional fallback to mock auth/local storage if omitted)
-   SUPABASE_URL="https://your-project.supabase.co"
-   SUPABASE_ANON_KEY="eyJhbG..."
-
-   # Razorpay Setup (Set mock payments to true to test checkout without credentials)
-   RAZORPAY_KEY_ID="rzp_test_..."
-   RAZORPAY_KEY_SECRET="your_secret"
-   ALLOW_MOCK_PAYMENTS="true"
-   ```
 
 ### Running the App
+
 * **Development Server**: Starts both backend API routes and the Vite frontend proxy on `http://localhost:3000`:
+
   ```bash
   npm run dev
   ```
+
 * **Run Integration Tests**: Executes payment signature, auth fallback, vetting, and history migration tests:
+
   ```bash
   npm test
   ```
+
 * **Production Build**: Compiles frontend assets and bundles the Express server:
+
   ```bash
   npm run build
   ```
@@ -91,7 +90,9 @@ An AI-powered communication coach and boundary assistant designed to help profes
 ---
 
 ## 🔄 Dynamic Model Upgrades
+
 To ensure the vetting pipeline remains unconstrained and future-proof:
+
 * The backend does **not** hardcode a single model name.
 * It dynamically resolves the target model:
   1. From the client request body payload (`req.body.model`).
@@ -119,7 +120,9 @@ sequenceDiagram
 ```
 
 ### Webhook Event Processing
+
 The webhook listener at `/api/webhooks/payments` handles asynchronous subscription state changes:
+
 * **`subscription.activated` / `payment.captured`**: Matches payment signature and transitions internal database row status to `ACTIVE`.
 * **`subscription.cancelled`**: Marks user subscription status as `CANCELLED`.
 * **`subscription.halted`**: Flags subscription status as `PAST_DUE`.
