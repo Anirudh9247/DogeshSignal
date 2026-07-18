@@ -52,7 +52,8 @@ app.use(helmet({
 const allowedOrigins = [
   process.env.APP_URL || "http://localhost:3000",
   "http://localhost:3000",
-  "http://localhost:5173"   // Vite dev server
+  "http://localhost:5173",   // Vite dev server
+  "https://dogeshsignal.netlify.app" // Production frontend
 ];
 app.use(cors({
   origin: (origin, callback) => {
@@ -109,7 +110,7 @@ async function startServer() {
     });
   }
 
-  app.listen(PORT, "localhost", () => {
+  app.listen(PORT, "0.0.0.0", () => {
     logEvent("INFO", `[Dogesh Signal] Server running on http://localhost:${PORT}`);
   });
 }

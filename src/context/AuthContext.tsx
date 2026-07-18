@@ -96,7 +96,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           createdAt: profile.created_at,
         };
         setUser(usrProfile);
-        await fetchEntitlements(authToken, usrProfile);
+        fetchEntitlements(authToken, usrProfile);
       }
     } catch (err) {
       console.error("Error fetching user profile:", err);
