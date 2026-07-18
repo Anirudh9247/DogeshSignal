@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { AnalysisResult } from "../types/analysis";
 import { useAuth } from "../context/AuthContext";
+import { clientFetch } from "../utils/clientFetch";
 
 export function useScan() {
   const { token } = useAuth();
@@ -12,6 +13,7 @@ export function useScan() {
 
   const loadingMessages = [
     "Checking message text...",
+    "Connecting to secure gateway (cold start might take up to a minute)...",
     "Looking for high-pressure requests & sudden urgencies...",
     "Highlighting emotional triggers & missing boundaries...",
     "Checking details on timelines & commitments...",
@@ -39,7 +41,7 @@ export function useScan() {
     }, 900);
 
     try {
-      const response = await fetch("/api/analyze", {
+      const response = await clientFetch("/api/analyze", {
         method: "POST",
         headers: { 
           "Content-Type": "application/json",

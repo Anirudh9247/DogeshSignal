@@ -7,6 +7,9 @@ export function validateEnvironment() {
     "VITE_SUPABASE_URL",
     "VITE_SUPABASE_ANON_KEY"
   ];
+  if (isProd) {
+    requiredVars.push("SUPABASE_SERVICE_ROLE_KEY", "RAZORPAY_KEY_ID", "RAZORPAY_KEY_SECRET");
+  }
   const missing = requiredVars.filter(v => !process.env[v]);
   if (missing.length > 0) {
     const msg = `[STARTUP ERROR] Missing required environment variables: ${missing.join(", ")}`;

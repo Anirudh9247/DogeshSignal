@@ -49,11 +49,15 @@ app.use(helmet({
 }));
 
 // ── CORS — only allow requests from our own origin in production ──────────────
+const envOrigins = process.env.ALLOWED_ORIGINS
+  ? process.env.ALLOWED_ORIGINS.split(",").map(o => o.trim()).filter(Boolean)
+  : [];
 const allowedOrigins = [
   process.env.APP_URL || "http://localhost:3000",
   "http://localhost:3000",
   "http://localhost:5173",   // Vite dev server
-  "https://dogeshsignal.netlify.app" // Production frontend
+  "https://dogeshsignal.netlify.app", // Production frontend
+  ...envOrigins
 ];
 app.use(cors({
   origin: (origin, callback) => {
@@ -91,6 +95,11 @@ app.use("/api", paymentRouter);
 app.use("/api", webhookRouter);
 app.use("/api", healthRouter);
 app.use("/api", entitlementsRouter);
+
+// Root health check endpoint for Render/hosting health checks
+app.get("/health", (_req, res) => {
+  res.json({ status: "healthy" });
+});
 
 // ── Server startup ────────────────────────────────────────────────────────────
 async function startServer() {

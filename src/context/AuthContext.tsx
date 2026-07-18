@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useState, useEffect } from "react";
 import { UserProfile, PlanType, Entitlements, PLAN_ENTITLEMENTS, FeatureKey } from "../plans/subscription";
 import { supabase, isSupabaseConfigured } from "../services/supabaseClient";
+import { clientFetch } from "../utils/clientFetch";
 
 export interface EntitlementPayload {
   userId: string;
@@ -64,7 +65,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
 
     try {
-      const response = await fetch("/api/entitlements", {
+      const response = await clientFetch("/api/entitlements", {
         headers: {
           "Authorization": `Bearer ${authToken}`
         }
@@ -199,7 +200,17 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   if (isInitializing) {
-    return null; // Prevent flash of login screen during initialization
+    return (
+      <div className="min-h-screen flex flex-col items-center justify-center bg-slate-50 dark:bg-slate-900 text-slate-800 dark:text-slate-100 font-sans">
+        <div className="flex flex-col items-center max-w-sm px-6 text-center space-y-4">
+          <div className="w-12 h-12 border-4 border-indigo-600 border-t-transparent rounded-full animate-spin"></div>
+          <h2 className="text-xl font-bold tracking-tight">Initializing Signal...</h2>
+          <p className="text-xs text-slate-500 dark:text-slate-400 leading-normal">
+            Connecting to secure gateway. Render servers may take up to a minute to wake up on cold starts.
+          </p>
+        </div>
+      </div>
+    );
   }
 
   return (
