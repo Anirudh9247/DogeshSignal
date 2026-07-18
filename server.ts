@@ -9,6 +9,7 @@ import compression from "compression";
 import { createServer as createViteServer } from "vite";
 import { validateEnvironment } from "./src/server/middleware/validateEnv.middleware";
 import { logEvent } from "./src/server/utils/logger";
+import { supabaseAdmin, isSupabaseConfiguredBackend } from "./src/server/utils/supabase";
 
 // Validate required configurations on boot
 validateEnvironment();

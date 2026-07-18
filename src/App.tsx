@@ -219,6 +219,8 @@ function DashboardView() {
     setResult,
     error,
     setError,
+    errorType,
+    setErrorType,
     activeDogLog,
     setActiveDogLog,
     triggerScan
